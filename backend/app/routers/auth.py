@@ -1,0 +1,101 @@
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from ..database import get_db
+from ..models.user import User
+from ..schemas.user import (
+    LoginRequest, TokenResponse, UserResponse, UserCreate, 
+    UserUpdate, PasswordChangeRequest
+)
+from ..auth import (
+    verify_password, get_password_hash, create_access_token, 
+    get_current_user, require_admin
+)
+
+router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+
+@router.post("/login", response_model=TokenResponse)
+def login(login_req: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == login_req.username.strip()).first()
+    if not user or not verify_password(login_req.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password"
+        )
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is disabled. Please contact Fee Administrator."
+        )
+
+    token = create_access_token(data={"sub": user.username, "role": user.role})
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": user
+    }
+
+@router.get("/me", response_model=UserResponse)
+def get_current_user_profile(current_user: User = Depends(get_current_user)):
+    return current_user
+
+@router.post("/change-password")
+def change_password(
+    pwd_req: PasswordChangeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not verify_password(pwd_req.old_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    
+    current_user.password_hash = get_password_hash(pwd_req.new_password)
+    db.commit()
+    return {"message": "Password updated successfully"}
+
+@router.get("/users", response_model=List[UserResponse])
+def list_users(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    return db.query(User).all()
+
+@router.post("/users", response_model=UserResponse)
+def create_user(
+    user_in: UserCreate,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    existing = db.query(User).filter(User.username == user_in.username.strip()).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already exists")
+
+    new_user = User(
+        username=user_in.username.strip(),
+        password_hash=get_password_hash(user_in.password),
+        full_name=user_in.full_name.strip(),
+        role=user_in.role.lower().strip(),
+        is_active=True
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
+@router.put("/users/{user_id}", response_model=UserResponse)
+def update_user(
+    user_id: int,
+    user_in: UserUpdate,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if user_in.full_name is not None:
+        user.full_name = user_in.full_name.strip()
+    if user_in.role is not None:
+        user.role = user_in.role.lower().strip()
+    if user_in.is_active is not None:
+        user.is_active = user_in.is_active
+
+    db.commit()
+    db.refresh(user)
+    return user

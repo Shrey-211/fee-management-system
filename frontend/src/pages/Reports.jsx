@@ -1,0 +1,363 @@
+import React, { useState, useEffect } from 'react';
+import { api } from '../api/client';
+import { FileSpreadsheet, Download, Calendar, Filter, ArrowUpDown } from 'lucide-react';
+
+export default function Reports({ onSelectStudent }) {
+  const [activeReport, setActiveReport] = useState('daily'); // 'daily' | 'outstanding'
+
+  // Daily Report State
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [dailyData, setDailyData] = useState(null);
+  const [loadingDaily, setLoadingDaily] = useState(true);
+
+  // Outstanding Report State
+  const [students, setStudents] = useState([]);
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [duesOnly, setDuesOnly] = useState(true);
+  const [loadingOutstanding, setLoadingOutstanding] = useState(true);
+
+  const loadDailyReport = async () => {
+    setLoadingDaily(true);
+    try {
+      const data = await api.getDailyReport({ start_date: startDate, end_date: endDate });
+      setDailyData(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingDaily(false);
+    }
+  };
+
+  const loadOutstandingReport = async () => {
+    setLoadingOutstanding(true);
+    try {
+      const params = {};
+      if (categoryFilter) params.category = categoryFilter;
+      if (duesOnly) params.has_dues_only = true;
+      const data = await api.getStudents(params);
+      setStudents(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingOutstanding(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeReport === 'daily') {
+      loadDailyReport();
+    } else {
+      loadOutstandingReport();
+    }
+  }, [activeReport, startDate, endDate, categoryFilter, duesOnly]);
+
+  const handleDownloadDailyExcel = () => {
+    api.downloadDailyReportExcel(startDate, endDate);
+  };
+
+  const handleDownloadOutstandingExcel = () => {
+    api.downloadOutstandingExcel('2026-2027');
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Report Switcher Tabs */}
+      <div className="flex border-b border-slate-200">
+        <button
+          onClick={() => setActiveReport('daily')}
+          className={`py-3 px-6 text-xs font-bold border-b-2 transition flex items-center gap-2 ${
+            activeReport === 'daily'
+              ? 'border-blue-600 text-blue-700 bg-blue-50/40'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <FileSpreadsheet className="w-4 h-4" />
+          Daily & Date-Range Collection Report
+        </button>
+
+        <button
+          onClick={() => setActiveReport('outstanding')}
+          className={`py-3 px-6 text-xs font-bold border-b-2 transition flex items-center gap-2 ${
+            activeReport === 'outstanding'
+              ? 'border-blue-600 text-blue-700 bg-blue-50/40'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <FileSpreadsheet className="w-4 h-4" />
+          Student Outstanding Balances Report
+        </button>
+      </div>
+
+      {/* DAILY / DATE-RANGE REPORT VIEW */}
+      {activeReport === 'daily' && (
+        <div className="space-y-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="font-semibold text-slate-600">From Date:</span>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="px-3 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 text-xs">
+                <span className="font-semibold text-slate-600">To Date:</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="px-3 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+
+              {/* Quick Range Presets */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => {
+                    const today = new Date().toISOString().split('T')[0];
+                    setStartDate(today);
+                    setEndDate(today);
+                  }}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium rounded border"
+                >
+                  Today
+                </button>
+                <button
+                  onClick={() => {
+                    setStartDate('2026-07-01');
+                    setEndDate('2026-10-31');
+                  }}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium rounded border"
+                >
+                  July – Oct 31
+                </button>
+              </div>
+            </div>
+
+            <button
+              onClick={handleDownloadDailyExcel}
+              className="w-full md:w-auto px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow transition"
+            >
+              <Download className="w-4 h-4" />
+              Download Excel Workbook (.xlsx)
+            </button>
+          </div>
+
+          {dailyData && (
+            <>
+              {/* Report Summary Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Period Collections</span>
+                  <p className="text-xl font-black text-slate-900 font-mono mt-1">
+                    ₹{Number(dailyData.total_collected).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-[10px] text-slate-500 mt-1">{dailyData.payments_count} Receipts</p>
+                </div>
+
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Cash Collections</span>
+                  <p className="text-xl font-black text-blue-700 font-mono mt-1">
+                    ₹{Number(dailyData.cash_collected).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-[10px] text-slate-500 mt-1">Physical counter cash</p>
+                </div>
+
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Digital / Bank Modes</span>
+                  <p className="text-xl font-black text-purple-700 font-mono mt-1">
+                    ₹{Number(dailyData.other_modes_collected).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-[10px] text-slate-500 mt-1">UPI, Cheque, NEFT</p>
+                </div>
+
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Event Fines Part</span>
+                  <p className="text-xl font-black text-amber-700 font-mono mt-1">
+                    ₹{Number(dailyData.fines_total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-[10px] text-slate-500 mt-1">Absence fines collected</p>
+                </div>
+              </div>
+
+              {/* Fee Head Breakdown Summary Bar */}
+              <div className="bg-slate-900 text-white p-4 rounded-xl shadow">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                  Collections Breakdown by Fee Head
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 text-xs">
+                  {Object.entries(dailyData.fee_head_totals || {}).map(([headName, amt]) => (
+                    <div key={headName} className="p-2.5 bg-slate-800/80 rounded-lg border border-slate-700">
+                      <span className="text-slate-400 text-[11px] block truncate">{headName}</span>
+                      <span className="font-mono font-bold text-sm text-slate-100">
+                        ₹{Number(amt).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Detailed Itemized Table */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+                      <tr>
+                        <th className="px-4 py-3">Receipt Date</th>
+                        <th className="px-4 py-3">System #</th>
+                        <th className="px-4 py-3">Manual Book #</th>
+                        <th className="px-4 py-3">Student Name</th>
+                        <th className="px-4 py-3">ID Code</th>
+                        <th className="px-4 py-3">Category</th>
+                        <th className="px-4 py-3">Mode</th>
+                        <th className="px-4 py-3">Bank Status</th>
+                        <th className="px-4 py-3 text-right">Amount (₹)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium">
+                      {dailyData.items.length === 0 ? (
+                        <tr>
+                          <td colSpan="9" className="px-4 py-8 text-center text-slate-400">
+                            No collection transactions found for this date range.
+                          </td>
+                        </tr>
+                      ) : (
+                        dailyData.items.map((item) => (
+                          <tr key={item.payment_id} className="hover:bg-slate-50/80">
+                            <td className="px-4 py-3 text-slate-600">{item.payment_date}</td>
+                            <td className="px-4 py-3 font-mono text-slate-400">{item.receipt_no}</td>
+                            <td className="px-4 py-3 font-mono font-black text-blue-900 bg-blue-50/20">{item.physical_receipt_no}</td>
+                            <td className="px-4 py-3 font-bold text-slate-900">{item.student_name}</td>
+                            <td className="px-4 py-3 font-mono text-slate-500">{item.student_code}</td>
+                            <td className="px-4 py-3">{item.category}</td>
+                            <td className="px-4 py-3">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
+                                {item.payment_mode}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                item.deposit_status === 'DEPOSITED'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}>
+                                {item.deposit_status === 'DEPOSITED' ? 'Banked' : 'Cash in Safe'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono font-black text-slate-900">
+                              ₹{Number(item.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* OUTSTANDING BALANCES REPORT VIEW */}
+      {activeReport === 'outstanding' && (
+        <div className="space-y-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="py-2 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
+              >
+                <option value="">All Categories</option>
+                <option value="OPEN">OPEN</option>
+                <option value="EBC">EBC</option>
+                <option value="SC">SC</option>
+                <option value="ST">ST</option>
+                <option value="OBC">OBC</option>
+                <option value="VJNT">VJNT</option>
+              </select>
+
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={duesOnly}
+                  onChange={(e) => setDuesOnly(e.target.checked)}
+                  className="rounded text-blue-600 focus:ring-blue-500"
+                />
+                Dues &gt; ₹0 Only
+              </label>
+            </div>
+
+            <button
+              onClick={handleDownloadOutstandingExcel}
+              className="w-full md:w-auto px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow transition"
+            >
+              <Download className="w-4 h-4" />
+              Download Outstanding Excel (.xlsx)
+            </button>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+                  <tr>
+                    <th className="px-4 py-3">Student ID</th>
+                    <th className="px-4 py-3">Student Name</th>
+                    <th className="px-4 py-3">Category</th>
+                    <th className="px-4 py-3">Gender</th>
+                    <th className="px-4 py-3">Phone</th>
+                    <th className="px-4 py-3 text-right">Applicable Fee</th>
+                    <th className="px-4 py-3 text-right">Fee Paid</th>
+                    <th className="px-4 py-3 text-right">Fines Due</th>
+                    <th className="px-4 py-3 text-right font-black">Net Total Due</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium">
+                  {students.length === 0 ? (
+                    <tr>
+                      <td colSpan="9" className="px-4 py-8 text-center text-slate-400">
+                        No students with outstanding balances found.
+                      </td>
+                    </tr>
+                  ) : (
+                    students.map((s) => (
+                      <tr
+                        key={s.id}
+                        onClick={() => onSelectStudent && onSelectStudent(s.id)}
+                        className="hover:bg-blue-50/50 cursor-pointer transition"
+                      >
+                        <td className="px-4 py-3 font-mono font-bold text-blue-700">{s.student_code}</td>
+                        <td className="px-4 py-3 font-bold text-slate-900">{s.full_name}</td>
+                        <td className="px-4 py-3">{s.category}</td>
+                        <td className="px-4 py-3">{s.gender}</td>
+                        <td className="px-4 py-3 text-slate-600">{s.mobile_number || '—'}</td>
+                        <td className="px-4 py-3 text-right font-mono text-slate-700">
+                          ₹{Number(s.net_fee_due).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-emerald-700 font-semibold">
+                          ₹{Number(s.total_fee_paid).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-amber-700">
+                          {Number(s.total_fines_balance) > 0 ? `₹${Number(s.total_fines_balance).toLocaleString('en-IN')}` : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono font-extrabold text-rose-600">
+                          ₹{Number(s.overall_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
