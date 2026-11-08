@@ -77,3 +77,4 @@ def update_smtp_settings(cfg: SmtpConfigUpdate, admin: User = Depends(require_ad
         f.write(f"SMTP_USE_TLS={'true' if cfg.use_tls else 'false'}\n")
 
     return {"message": "SMTP configuration updated successfully"}
+

@@ -26,3 +26,4 @@ class ReminderLog(Base):
     error_message = Column(Text, nullable=True)
 
     student = relationship("Student")
+

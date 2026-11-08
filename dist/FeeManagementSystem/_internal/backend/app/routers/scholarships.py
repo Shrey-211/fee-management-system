@@ -76,3 +76,4 @@ def create_scholarship(
     recalculate_student_balances(student.id, db)
     db.refresh(sc)
     return serialize_scholarship(sc)
+

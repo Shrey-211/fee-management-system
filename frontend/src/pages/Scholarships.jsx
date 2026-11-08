@@ -288,3 +288,4 @@ export default function Scholarships() {
     </div>
   );
 }
+

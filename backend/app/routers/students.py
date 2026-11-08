@@ -172,11 +172,8 @@ def get_student_detail(
             "student_code": student.student_code,
             "payment_date": p.payment_date,
             "entry_date": p.entry_date,
-            "bank_deposit_date": p.bank_deposit_date,
             "payment_mode": p.payment_mode,
             "total_amount": p.total_amount,
-            "deposit_status": p.deposit_status,
-            "deposit_batch_id": p.deposit_batch_id,
             "remarks": p.remarks,
             "created_at": p.created_at,
             "items": items
@@ -276,3 +273,4 @@ def update_student(
     recalculate_student_balances(student.id, db)
     db.refresh(student)
     return build_student_response(student)
+

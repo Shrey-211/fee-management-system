@@ -53,3 +53,4 @@ class OutstandingStudentRow(BaseModel):
     fines_paid: Decimal
     fines_balance: Decimal
     total_outstanding: Decimal
+

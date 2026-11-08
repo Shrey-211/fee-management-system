@@ -8,3 +8,4 @@ echo ===================================================================
 echo Starting local service...
 python entrypoint.py
 pause
+

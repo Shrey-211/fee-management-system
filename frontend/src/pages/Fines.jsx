@@ -332,3 +332,4 @@ export default function Fines({ initialStudent, onClearInitialStudent, onSelectS
     </div>
   );
 }
+

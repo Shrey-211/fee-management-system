@@ -18,3 +18,4 @@ class ScholarshipCredit(Base):
 
     student = relationship("Student", back_populates="scholarships")
     fee_head = relationship("FeeHead")
+

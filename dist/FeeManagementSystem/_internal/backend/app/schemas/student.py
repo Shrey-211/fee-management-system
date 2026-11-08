@@ -58,3 +58,4 @@ class StudentDetailResponse(StudentResponse):
     payments: List[PaymentResponse] = []
     fines: List[FineResponse] = []
     scholarships: List[ScholarshipCreditResponse] = []
+

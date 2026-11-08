@@ -38,3 +38,4 @@ class UserResponse(BaseModel):
         from_attributes = True
 
 TokenResponse.model_rebuild()
+

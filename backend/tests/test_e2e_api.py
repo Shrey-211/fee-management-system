@@ -1,4 +1,5 @@
 import pytest
+import uuid
 from decimal import Decimal
 from fastapi.testclient import TestClient
 from backend.app.main import app
@@ -43,7 +44,7 @@ def test_login_and_security_measures():
     assert unauth_res.status_code == 401
 
 
-def test_full_workflow_student_payment_fines_batch():
+def test_full_workflow_student_payment_fines():
     # 1. Login as Clerk
     login_res = client.post("/api/auth/login", json={"username": "clerk", "password": "clerk123"})
     assert login_res.status_code == 200
@@ -57,8 +58,9 @@ def test_full_workflow_student_payment_fines_batch():
     assert len(students) >= 6
 
     # 3. Create a new student (EBC Male)
+    unique_code = f"STU-E2E-{uuid.uuid4().hex[:6].upper()}"
     new_student_payload = {
-        "student_code": "STU-E2E-TEST",
+        "student_code": unique_code,
         "full_name": "Integration Test Student",
         "gender": "MALE",
         "category": "EBC",
@@ -105,21 +107,15 @@ def test_full_workflow_student_payment_fines_batch():
     assert pay_res.status_code == 200
     payment_data = pay_res.json()
     assert payment_data["physical_receipt_no"] == "MANUAL-BOOK-99/101"
-    assert payment_data["deposit_status"] == "UNDEPOSITED_CASH"
+    assert Decimal(str(payment_data["total_amount"])) == Decimal("20000.00")
 
-    # 7. Check Cash Status in Hand
-    cash_res = client.get("/api/batches/cash-status", headers=headers)
-    assert cash_res.status_code == 200
-    cash_data = cash_res.json()
-    assert cash_data["total_undeposited_cash"] >= 20000.0
-
-    # 8. Download Daily Report Excel
+    # 7. Download Daily Report Excel
     excel_res = client.get("/api/reports/daily/excel", headers=headers)
     assert excel_res.status_code == 200
     assert "spreadsheetml" in excel_res.headers["content-type"]
     assert len(excel_res.content) > 1000
 
-    # 9. Download Outstanding Excel
+    # 8. Download Outstanding Excel
     out_excel_res = client.get("/api/reports/outstanding/excel", headers=headers)
     assert out_excel_res.status_code == 200
     assert "spreadsheetml" in out_excel_res.headers["content-type"]

@@ -6,21 +6,20 @@ from sqlalchemy.orm import sessionmaker
 from backend.app.database import Base
 from backend.app.models import (
     User, Student, FeeHead, StudentFeeHead, 
-    Payment, PaymentItem, Fine, ScholarshipCredit, BankDepositBatch
+    Payment, PaymentItem, Fine, ScholarshipCredit
 )
 from backend.app.services.fee_engine import (
     calculate_fee_waiver, initialize_student_fees, 
     recalculate_student_balances, quantize_amount
 )
 from backend.app.services.payment_service import record_payment
-from backend.app.services.batch_service import get_cash_in_hand_summary, create_bank_deposit_batch
 from backend.app.services.fine_service import apply_fine, update_fine_status
 from backend.app.services.report_service import (
     generate_daily_collection_report, export_daily_collection_excel, export_outstanding_dues_excel
 )
 from backend.app.services.backup_service import perform_sqlite_backup, list_backups
 from backend.app.auth import verify_password, get_password_hash, create_access_token
-from backend.app.schemas.payment import PaymentCreate, PaymentItemCreate, BankDepositBatchCreate
+from backend.app.schemas.payment import PaymentCreate, PaymentItemCreate
 from backend.app.schemas.fine import FineCreate, FineUpdate
 
 # Test database in memory
@@ -166,81 +165,6 @@ def test_residual_balance_precision_edge_case(db):
     db.refresh(tuition_head)
     assert tuition_head.paid_amount == Decimal("59999.00")
     assert tuition_head.balance == Decimal("1.00") # Exactly ₹1.00!
-
-
-def test_cash_accumulation_and_batch_alert(db):
-    """
-    Verifies that cash receipts accumulate and alert triggers at ₹40,000–₹50,000 threshold,
-    and batching deposits reset the status.
-    """
-    student = Student(
-        student_code="STU-CASH-01",
-        full_name="Cash Tester",
-        gender="MALE",
-        category="OPEN",
-        academic_year="2026-2027"
-    )
-    db.add(student)
-    db.commit()
-    initialize_student_fees(student, db)
-
-    tuition_head = db.query(StudentFeeHead).join(FeeHead).filter(
-        StudentFeeHead.student_id == student.id,
-        FeeHead.code == "TUITION"
-    ).first()
-
-    # 1. Initial Cash Status is 0
-    status1 = get_cash_in_hand_summary(db)
-    assert status1["total_undeposited_cash"] == 0.0
-    assert status1["alert_level"] == "NORMAL"
-
-    # 2. Pay ₹25,000 in cash -> Normal alert
-    record_payment(db, PaymentCreate(
-        student_id=student.id,
-        physical_receipt_no="RCP-CASH-01",
-        payment_mode="CASH",
-        items=[PaymentItemCreate(fee_head_id=tuition_head.fee_head_id, amount=Decimal("25000.00"))]
-    ))
-    status2 = get_cash_in_hand_summary(db)
-    assert status2["total_undeposited_cash"] == 25000.0
-    assert status2["alert_level"] == "NORMAL"
-
-    # 3. Pay another ₹20,000 in cash (Total = ₹45,000) -> WARNING Alert (>= ₹40k)
-    record_payment(db, PaymentCreate(
-        student_id=student.id,
-        physical_receipt_no="RCP-CASH-02",
-        payment_mode="CASH",
-        items=[PaymentItemCreate(fee_head_id=tuition_head.fee_head_id, amount=Decimal("20000.00"))]
-    ))
-    status3 = get_cash_in_hand_summary(db)
-    assert status3["total_undeposited_cash"] == 45000.0
-    assert status3["alert_level"] == "WARNING"
-
-    # 4. Pay another ₹10,000 in cash (Total = ₹55,000) -> CRITICAL Alert (>= ₹50k)
-    record_payment(db, PaymentCreate(
-        student_id=student.id,
-        physical_receipt_no="RCP-CASH-03",
-        payment_mode="CASH",
-        items=[PaymentItemCreate(fee_head_id=tuition_head.fee_head_id, amount=Decimal("10000.00"))]
-    ))
-    status4 = get_cash_in_hand_summary(db)
-    assert status4["total_undeposited_cash"] == 55000.0
-    assert status4["alert_level"] == "CRITICAL"
-
-    # 5. Batch deposit all unbatched payments
-    payment_ids = [p["id"] for p in status4["payments"]]
-    batch = create_bank_deposit_batch(db, BankDepositBatchCreate(
-        bank_name="State Bank of India",
-        bank_challan_no="CHAL-SBI-9988",
-        payment_ids=payment_ids
-    ))
-    assert batch.total_cash_amount == Decimal("55000.00")
-    assert batch.status == "DEPOSITED"
-
-    # 6. Verify cash in hand reset to 0
-    status5 = get_cash_in_hand_summary(db)
-    assert status5["total_undeposited_cash"] == 0.0
-    assert status5["alert_level"] == "NORMAL"
 
 
 def test_event_fine_and_partial_payment(db):

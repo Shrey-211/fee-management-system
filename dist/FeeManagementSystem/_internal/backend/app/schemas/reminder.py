@@ -40,3 +40,4 @@ class TestEmailRequest(BaseModel):
     smtp_from_email: Optional[str] = None
     smtp_from_name: Optional[str] = None
     use_tls: Optional[bool] = True
+

@@ -49,14 +49,7 @@ def record_payment(
     # Clean dates
     pay_date = payment_in.payment_date or date.today()
     ent_date = payment_in.entry_date or date.today()
-
-    # Determine deposit status
     mode = payment_in.payment_mode.upper().strip()
-    if mode == "CASH":
-        deposit_status = "DEPOSITED" if payment_in.bank_deposit_date else "UNDEPOSITED_CASH"
-    else:
-        # Non-cash transactions (UPI, NEFT, Cheque) go directly to bank
-        deposit_status = "DEPOSITED"
 
     internal_receipt = generate_internal_receipt_no(db, student.academic_year)
 
@@ -66,10 +59,8 @@ def record_payment(
         student_id=student.id,
         payment_date=pay_date,
         entry_date=ent_date,
-        bank_deposit_date=payment_in.bank_deposit_date,
         payment_mode=mode,
         total_amount=total_amount,
-        deposit_status=deposit_status,
         recorded_by_id=current_user.id if current_user else None,
         remarks=payment_in.remarks
     )

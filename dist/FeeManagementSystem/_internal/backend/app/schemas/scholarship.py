@@ -28,3 +28,4 @@ class ScholarshipCreditResponse(BaseModel):
 
     class Config:
         from_attributes = True
+

@@ -147,3 +147,4 @@ def dispatch_reminder_to_student(
     db.commit()
     db.refresh(log)
     return log
+

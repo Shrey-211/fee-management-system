@@ -10,7 +10,7 @@ from .seed import seed_database
 from .services.backup_service import perform_sqlite_backup
 from .routers import (
     auth, students, fees, payments, fines, 
-    batches, scholarships, reports, reminders, settings as settings_router
+    scholarships, reports, reminders, settings as settings_router
 )
 
 app = FastAPI(
@@ -34,7 +34,6 @@ app.include_router(students.router)
 app.include_router(fees.router)
 app.include_router(payments.router)
 app.include_router(fines.router)
-app.include_router(batches.router)
 app.include_router(scholarships.router)
 app.include_router(reports.router)
 app.include_router(reminders.router)
@@ -84,3 +83,4 @@ else:
             "docs": "/docs",
             "frontend_status": "Vite dev server running on port 5173 or not yet built."
         }
+

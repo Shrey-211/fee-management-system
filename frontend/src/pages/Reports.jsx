@@ -168,7 +168,7 @@ export default function Reports({ onSelectStudent }) {
                 </div>
 
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Digital / Bank Modes</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Digital / Online Modes</span>
                   <p className="text-xl font-black text-purple-700 font-mono mt-1">
                     ₹{Number(dailyData.other_modes_collected).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </p>
@@ -214,14 +214,13 @@ export default function Reports({ onSelectStudent }) {
                         <th className="px-4 py-3">ID Code</th>
                         <th className="px-4 py-3">Category</th>
                         <th className="px-4 py-3">Mode</th>
-                        <th className="px-4 py-3">Bank Status</th>
                         <th className="px-4 py-3 text-right">Amount (₹)</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-medium">
                       {dailyData.items.length === 0 ? (
                         <tr>
-                          <td colSpan="9" className="px-4 py-8 text-center text-slate-400">
+                          <td colSpan="8" className="px-4 py-8 text-center text-slate-400">
                             No collection transactions found for this date range.
                           </td>
                         </tr>
@@ -237,15 +236,6 @@ export default function Reports({ onSelectStudent }) {
                             <td className="px-4 py-3">
                               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
                                 {item.payment_mode}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                item.deposit_status === 'DEPOSITED'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : 'bg-amber-100 text-amber-800'
-                              }`}>
-                                {item.deposit_status === 'DEPOSITED' ? 'Banked' : 'Cash in Safe'}
                               </span>
                             </td>
                             <td className="px-4 py-3 text-right font-mono font-black text-slate-900">
@@ -361,3 +351,4 @@ export default function Reports({ onSelectStudent }) {
     </div>
   );
 }
+

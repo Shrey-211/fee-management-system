@@ -20,3 +20,4 @@ class Fine(Base):
 
     student = relationship("Student", back_populates="fines")
     payment_items = relationship("PaymentItem", back_populates="fine")
+

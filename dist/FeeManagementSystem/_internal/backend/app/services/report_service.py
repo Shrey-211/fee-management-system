@@ -94,8 +94,6 @@ def generate_daily_collection_report(
             "category": student.category if student else "N/A",
             "payment_mode": p.payment_mode,
             "payment_date": str(p.payment_date),
-            "bank_deposit_date": str(p.bank_deposit_date) if p.bank_deposit_date else "Not Deposited",
-            "deposit_status": p.deposit_status,
             "total_amount": float(amt),
             "head_breakdown": {k: float(v) for k, v in breakdown.items()},
             "fine_amount": float(fine_part)
@@ -122,12 +120,12 @@ def export_daily_collection_excel(db: Session, start_date: date, end_date: date)
     ws.title = "Daily Collection Report"
 
     # College Title Header
-    ws.merge_cells("A1:I1")
+    ws.merge_cells("A1:H1")
     ws["A1"] = "COLLEGE FEE MANAGEMENT SYSTEM — FEE COLLECTION REPORT"
     ws["A1"].font = Font(name="Calibri", size=14, bold=True, color="1E3A8A")
     ws["A1"].alignment = Alignment(horizontal="center")
 
-    ws.merge_cells("A2:I2")
+    ws.merge_cells("A2:H2")
     ws["A2"] = f"Period: {start_date} to {end_date} | Generated Offline"
     ws["A2"].font = Font(name="Calibri", size=10, italic=True)
     ws["A2"].alignment = Alignment(horizontal="center")
@@ -137,7 +135,7 @@ def export_daily_collection_excel(db: Session, start_date: date, end_date: date)
     # Table Headers
     headers = [
         "Receipt Date", "System Receipt #", "Manual Receipt #", "Student ID", 
-        "Student Name", "Category", "Payment Mode", "Deposit Status", "Amount (₹)"
+        "Student Name", "Category", "Payment Mode", "Amount (₹)"
     ]
     ws.append(headers)
     style_row(ws[4], fill=HEADER_FILL, font=HEADER_FONT, alignment=Alignment(horizontal="center"))
@@ -152,21 +150,20 @@ def export_daily_collection_excel(db: Session, start_date: date, end_date: date)
             item["student_name"],
             item["category"],
             item["payment_mode"],
-            item["deposit_status"],
             item["total_amount"]
         ]
         ws.append(row_vals)
         style_row(ws[row_idx], font=NORMAL_FONT)
-        ws[f"I{row_idx}"].number_format = "#,##0.00"
+        ws[f"H{row_idx}"].number_format = "#,##0.00"
         row_idx += 1
 
     # Total Row
     total_row = [
-        "TOTAL", "", "", "", "", "", "", "", report_data["total_collected"]
+        "TOTAL", "", "", "", "", "", "", report_data["total_collected"]
     ]
     ws.append(total_row)
     style_row(ws[row_idx], fill=TOTAL_FILL, font=BOLD_FONT)
-    ws[f"I{row_idx}"].number_format = "#,##0.00"
+    ws[f"H{row_idx}"].number_format = "#,##0.00"
 
     # Auto-adjust column widths
     for col_idx, col in enumerate(ws.columns, 1):

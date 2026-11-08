@@ -12,3 +12,4 @@ class AuditLog(Base):
     entity_id = Column(Integer, nullable=True)
     details = Column(Text, nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow)
+

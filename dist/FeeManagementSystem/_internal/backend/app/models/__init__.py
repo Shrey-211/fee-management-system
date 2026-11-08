@@ -1,7 +1,6 @@
 from .user import User
 from .fee import FeeHead, StudentFeeHead
 from .student import Student
-from .batch import BankDepositBatch
 from .fine import Fine
 from .payment import Payment, PaymentItem
 from .scholarship import ScholarshipCredit
@@ -13,7 +12,6 @@ __all__ = [
     "FeeHead",
     "StudentFeeHead",
     "Student",
-    "BankDepositBatch",
     "Fine",
     "Payment",
     "PaymentItem",

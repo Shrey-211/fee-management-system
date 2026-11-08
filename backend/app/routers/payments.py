@@ -32,11 +32,8 @@ def serialize_payment(p: Payment) -> dict:
         "student_code": p.student.student_code if p.student else "N/A",
         "payment_date": p.payment_date,
         "entry_date": p.entry_date,
-        "bank_deposit_date": p.bank_deposit_date,
         "payment_mode": p.payment_mode,
         "total_amount": p.total_amount,
-        "deposit_status": p.deposit_status,
-        "deposit_batch_id": p.deposit_batch_id,
         "remarks": p.remarks,
         "created_at": p.created_at,
         "items": items
@@ -48,7 +45,6 @@ def get_payments(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     payment_mode: Optional[str] = None,
-    deposit_status: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -61,8 +57,6 @@ def get_payments(
         query = query.filter(Payment.payment_date <= end_date)
     if payment_mode:
         query = query.filter(Payment.payment_mode == payment_mode.upper().strip())
-    if deposit_status:
-        query = query.filter(Payment.deposit_status == deposit_status.upper().strip())
 
     payments = query.order_by(Payment.payment_date.desc(), Payment.id.desc()).all()
     return [serialize_payment(p) for p in payments]

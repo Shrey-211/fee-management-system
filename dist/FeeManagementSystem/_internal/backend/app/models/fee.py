@@ -34,3 +34,4 @@ class StudentFeeHead(Base):
 
     student = relationship("Student", back_populates="fee_heads")
     fee_head = relationship("FeeHead", back_populates="student_fee_heads")
+

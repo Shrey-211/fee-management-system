@@ -73,3 +73,4 @@ def update_fee_head(
     db.commit()
     db.refresh(head)
     return head
+

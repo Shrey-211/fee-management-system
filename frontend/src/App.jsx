@@ -6,7 +6,6 @@ import Dashboard from './pages/Dashboard';
 import Students from './pages/Students';
 import StudentDetail from './pages/StudentDetail';
 import Payments from './pages/Payments';
-import BankBatches from './pages/BankBatches';
 import Fines from './pages/Fines';
 import Scholarships from './pages/Scholarships';
 import Reports from './pages/Reports';
@@ -21,7 +20,6 @@ export default function App() {
   const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [studentForPayment, setStudentForPayment] = useState(null);
   const [studentForFine, setStudentForFine] = useState(null);
-  const [cashStatus, setCashStatus] = useState(null);
 
   // Change Password Modal
   const [showPwdModal, setShowPwdModal] = useState(false);
@@ -44,22 +42,6 @@ export default function App() {
     window.addEventListener('auth-expired', handleAuthExpired);
     return () => window.removeEventListener('auth-expired', handleAuthExpired);
   }, []);
-
-  const refreshCashStatus = async () => {
-    if (!user) return;
-    try {
-      const data = await api.getCashStatus();
-      setCashStatus(data);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  useEffect(() => {
-    if (user) {
-      refreshCashStatus();
-    }
-  }, [user, tab]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -110,7 +92,6 @@ export default function App() {
             setSelectedStudentId(null);
           }}
           user={user}
-          cashStatus={cashStatus}
         />
 
         <main className="flex-1 p-6 overflow-y-auto">
@@ -165,8 +146,6 @@ export default function App() {
               }}
             />
           )}
-
-          {tab === 'batches' && <BankBatches />}
 
           {tab === 'fines' && (
             <Fines

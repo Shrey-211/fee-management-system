@@ -91,18 +91,12 @@ export const api = {
     body: JSON.stringify(data)
   }),
 
-  // Payments & Cash
+  // Payments
   getPayments: (params = {}) => {
     const q = new URLSearchParams(params).toString();
     return request(`/payments${q ? `?${q}` : ''}`);
   },
   createPayment: (data) => request('/payments', {
-    method: 'POST',
-    body: JSON.stringify(data)
-  }),
-  getCashStatus: () => request('/batches/cash-status'),
-  getBatches: () => request('/batches'),
-  createBatch: (data) => request('/batches', {
     method: 'POST',
     body: JSON.stringify(data)
   }),
@@ -185,3 +179,4 @@ export const api = {
     body: JSON.stringify(data)
   })
 };
+

@@ -147,3 +147,4 @@ def test_smtp_configuration(
     if not res["success"]:
         raise HTTPException(status_code=400, detail=res["error"])
     return {"message": f"Test email sent successfully to {test_req.test_email}"}
+

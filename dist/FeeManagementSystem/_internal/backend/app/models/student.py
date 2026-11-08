@@ -26,3 +26,4 @@ class Student(Base):
     payments = relationship("Payment", back_populates="student", cascade="all, delete-orphan")
     fines = relationship("Fine", back_populates="student", cascade="all, delete-orphan")
     scholarships = relationship("ScholarshipCredit", back_populates="student", cascade="all, delete-orphan")
+

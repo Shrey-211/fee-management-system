@@ -1,22 +1,14 @@
 import React from 'react';
 import { 
-  LayoutDashboard, Users, Receipt, Landmark, 
+  LayoutDashboard, Users, Receipt, 
   AlertCircle, Award, FileSpreadsheet, Mail, Settings 
 } from 'lucide-react';
 
-export default function Sidebar({ currentTab, setTab, user, cashStatus }) {
+export default function Sidebar({ currentTab, setTab, user }) {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'students', label: 'Students Directory', icon: Users },
     { id: 'payments', label: 'Payments & Receipts', icon: Receipt },
-    { 
-      id: 'batches', 
-      label: 'Cash & Bank Batches', 
-      icon: Landmark, 
-      badge: cashStatus && cashStatus.total_undeposited_cash > 0 
-        ? `₹${Math.round(cashStatus.total_undeposited_cash / 1000)}k` 
-        : null 
-    },
     { id: 'fines', label: 'Event Fines', icon: AlertCircle },
     { id: 'scholarships', label: 'Scholarships', icon: Award },
     { id: 'reports', label: 'Reports & Excel Export', icon: FileSpreadsheet },
@@ -52,11 +44,6 @@ export default function Sidebar({ currentTab, setTab, user, cashStatus }) {
                 <Icon className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
                 <span>{item.label}</span>
               </div>
-              {item.badge && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
-                  {item.badge}
-                </span>
-              )}
             </button>
           );
         })}

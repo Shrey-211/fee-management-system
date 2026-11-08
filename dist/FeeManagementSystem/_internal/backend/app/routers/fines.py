@@ -60,3 +60,4 @@ def update_fine(
 ):
     fine = update_fine_status(db, fine_id, fine_in, current_user=current_user)
     return serialize_fine(fine)
+

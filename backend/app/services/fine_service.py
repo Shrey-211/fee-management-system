@@ -67,3 +67,4 @@ def update_fine_status(
     recalculate_student_balances(fine.student_id, db)
     db.refresh(fine)
     return fine
+

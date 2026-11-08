@@ -1,6 +1,6 @@
 # Student Fee Management System — Offline Edition
 
-An internal, air-gapped, offline-first desktop application designed for single-PC deployment (designated for Mr. Shrikant's office workstation). The software handles student fee structures, configurable waiver rules, manual receipt book logging, event fines, bank deposit batching, and automated Excel reporting with zero internet or cloud subscription dependencies.
+An internal, air-gapped, offline-first desktop application designed for single-PC deployment (designated for Mr. Shrikant's office workstation). The software handles student fee structures, configurable waiver rules, manual receipt book logging, event fines, and automated Excel reporting with zero internet or cloud subscription dependencies.
 
 ---
 
@@ -29,7 +29,7 @@ The system comes pre-seeded with three role-based accounts:
 | Role | Username | Initial Password | Permissions |
 | :--- | :--- | :--- | :--- |
 | **Fee Administrator** (Mr. Shrikant) | `admin` | `admin123` | Full administrative control: fee structures, user management, offline database backups, SMTP config, waiver overrides |
-| **Accountant** | `accountant` | `account123` | Cash & bank deposit batching, event fine tracking, Excel reports export, email reminders dispatch |
+| **Accountant** | `accountant` | `account123` | Event fine tracking, fee collection tracking, Excel reports export, email reminders dispatch |
 | **Clerk** | `clerk` | `clerk123` | Student directory lookups, payment entry with manual receipt book numbers, viewing balances |
 
 > [!NOTE]
@@ -64,14 +64,9 @@ The system applies deterministic rules configured per academic year:
 1. **Manual Physical Receipt Book Entry**:
    - The cashier issues the paper receipt to the student from the physical booklet.
    - On the system's **"Enter Physical Receipt"** screen, staff select the student, enter the **Manual Receipt Number** (e.g. `BOOK-12/0459`), and allocate the payment across applicable fee heads or fines.
-2. **Dual-Date Accounting**:
-   - `Payment Date`: Date on which cash was collected at the counter.
-   - `Bank Deposit Date`: Date cash was deposited at the bank.
-3. **Cash in Hand & Threshold Alerts (₹40,000–₹50,000)**:
-   - Cash receipts are tracked as `UNDEPOSITED_CASH`.
-   - When accumulated cash reaches **₹40,000–₹50,000**, an advisory banner alert highlights that cash is ready for a bank deposit batch.
-4. **Bank Deposit Batching**:
-   - In the **Cash & Bank Batches** screen, staff select accumulated receipts, enter the college bank name and bank challan number, and confirm the batch.
+2. **Instant Receipt Recognition**:
+   - Once a payment is recorded and marked received, it is immediately credited to the student's ledger and daily collections. No secondary bank deposit or batching status is required.
+   - Shows real-time payment history and remaining due by fee head and in total.
 
 ---
 
@@ -105,3 +100,4 @@ The system applies deterministic rules configured per academic year:
 - SQLite engine configured with Write-Ahead Logging (`WAL`) mode for crash resiliency.
 - **Automatic Daily Backups**: Timestamped snapshots saved to `backend/backups/`.
 - **One-Click USB Backup**: Click **"Backup Database Now"** in Settings to generate a fresh snapshot and download the `.db` file for safekeeping on an external USB pen drive.
+

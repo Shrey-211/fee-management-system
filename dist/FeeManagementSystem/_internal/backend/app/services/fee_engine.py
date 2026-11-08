@@ -168,3 +168,4 @@ def recalculate_student_balances(student_id: int, db: Session):
             fine.status = "UNPAID"
 
     db.commit()
+

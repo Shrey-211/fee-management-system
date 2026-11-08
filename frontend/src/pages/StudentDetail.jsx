@@ -338,7 +338,6 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
                 <th className="px-4 py-2.5">Manual Receipt #</th>
                 <th className="px-4 py-2.5">System Audit #</th>
                 <th className="px-4 py-2.5">Payment Mode</th>
-                <th className="px-4 py-2.5">Bank Deposit Date</th>
                 <th className="px-4 py-2.5">Allocation Items</th>
                 <th className="px-4 py-2.5 text-right font-bold">Total Amount</th>
               </tr>
@@ -346,7 +345,7 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
             <tbody className="divide-y divide-slate-100 font-medium">
               {student.payments.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-4 py-6 text-center text-slate-400">
+                  <td colSpan="6" className="px-4 py-6 text-center text-slate-400">
                     No payment receipts logged yet.
                   </td>
                 </tr>
@@ -360,13 +359,6 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
                         {p.payment_mode}
                       </span>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {p.bank_deposit_date ? (
-                        <span className="text-emerald-700 font-medium">{p.bank_deposit_date}</span>
-                      ) : (
-                        <span className="text-amber-700 font-medium">Pending Bank Deposit</span>
-                      )}
                     </td>
                     <td className="px-4 py-3 text-slate-600">
                       <div className="space-y-0.5">
@@ -390,3 +382,4 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
     </div>
   );
 }
+

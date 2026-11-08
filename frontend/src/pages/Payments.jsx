@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { 
   Receipt, Plus, Search, Filter, Calendar, 
-  CheckCircle, Banknote, X, AlertCircle 
+  CheckCircle, X, AlertCircle 
 } from 'lucide-react';
 
 export default function Payments({ initialStudent, onClearInitialStudent, onSelectStudent }) {
@@ -14,7 +14,6 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
   // Filters
   const [search, setSearch] = useState('');
   const [paymentMode, setPaymentMode] = useState('');
-  const [depositStatus, setDepositStatus] = useState('');
 
   // Payment Form State
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -22,7 +21,6 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
   const [physicalReceiptNo, setPhysicalReceiptNo] = useState('');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [mode, setMode] = useState('CASH');
-  const [bankDepositDate, setBankDepositDate] = useState('');
   const [remarks, setRemarks] = useState('');
   const [headAllocations, setHeadAllocations] = useState({});
   const [fineAllocations, setFineAllocations] = useState({});
@@ -34,7 +32,6 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
     try {
       const params = {};
       if (paymentMode) params.payment_mode = paymentMode;
-      if (depositStatus) params.deposit_status = depositStatus;
       const data = await api.getPayments(params);
       setPayments(data);
     } catch (e) {
@@ -56,7 +53,7 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
   useEffect(() => {
     loadPayments();
     loadStudents();
-  }, [paymentMode, depositStatus]);
+  }, [paymentMode]);
 
   // Open modal if initialStudent passed from other screens
   useEffect(() => {
@@ -167,7 +164,6 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
         physical_receipt_no: physicalReceiptNo.trim(),
         payment_date: paymentDate,
         payment_mode: mode,
-        bank_deposit_date: bankDepositDate || null,
         remarks: remarks.trim() || null,
         items
       });
@@ -221,16 +217,6 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
             <option value="DD">Demand Draft (DD)</option>
             <option value="NEFT">NEFT / Bank Transfer</option>
           </select>
-
-          <select
-            value={depositStatus}
-            onChange={(e) => setDepositStatus(e.target.value)}
-            className="py-2 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
-          >
-            <option value="">All Deposit Status</option>
-            <option value="UNDEPOSITED_CASH">Cash in Safe / Undeposited</option>
-            <option value="DEPOSITED">Deposited to Bank</option>
-          </select>
         </div>
 
         <button
@@ -257,21 +243,20 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
                 <th className="px-4 py-3">System #</th>
                 <th className="px-4 py-3">Student Particulars</th>
                 <th className="px-4 py-3">Mode</th>
-                <th className="px-4 py-3">Deposit Status</th>
                 <th className="px-4 py-3">Fee Head Breakdown</th>
-                <th className="px-4 py-3 text-right">Total Amount</th>
+                <th className="px-4 py-3 text-right">Total Amount Received</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {loading ? (
                 <tr>
-                  <td colSpan="8" className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan="7" className="px-4 py-8 text-center text-slate-400">
                     Loading payments registry...
                   </td>
                 </tr>
               ) : filteredPayments.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan="7" className="px-4 py-8 text-center text-slate-400">
                     No payment receipts found matching criteria.
                   </td>
                 </tr>
@@ -297,15 +282,6 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
                         {p.payment_mode}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        p.deposit_status === 'DEPOSITED'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        {p.deposit_status === 'DEPOSITED' ? 'Banked' : 'Cash In Safe'}
-                      </span>
-                    </td>
                     <td className="px-4 py-3 text-slate-600">
                       <div className="space-y-0.5 text-[11px]">
                         {p.items.map((itm) => (
@@ -315,7 +291,7 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
                         ))}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right font-mono font-black text-slate-900">
+                    <td className="px-4 py-3 text-right font-mono font-black text-emerald-700">
                       ₹{Number(p.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </td>
                   </tr>
@@ -333,7 +309,7 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
             <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-bold">Record Physical Book Fee Receipt</h3>
-                <p className="text-xs text-slate-400">Cross-reference paper receipt book with system ledger</p>
+                <p className="text-xs text-slate-400">Log incoming payment from manual receipt book</p>
               </div>
               <button
                 onClick={() => setShowModal(false)}
@@ -386,7 +362,7 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Payment Date (Receipt Date) *
+                    Receipt Date *
                   </label>
                   <input
                     type="date"
@@ -406,7 +382,7 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
                     onChange={(e) => setMode(e.target.value)}
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
                   >
-                    <option value="CASH">Cash (In Hand / Safe)</option>
+                    <option value="CASH">Cash</option>
                     <option value="UPI">UPI / QR Code</option>
                     <option value="CHEQUE">Cheque</option>
                     <option value="DD">Demand Draft</option>
@@ -506,7 +482,7 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between">
                 <div>
                   <span className="font-bold text-blue-900">Total Receipt Amount:</span>
-                  <p className="text-[10px] text-blue-600">Sum of all entered fee head allocations</p>
+                  <p className="text-[10px] text-blue-600">Sum of all entered fee allocations</p>
                 </div>
                 <div className="text-right">
                   <span className="text-xl font-black text-blue-900 font-mono">
@@ -519,7 +495,7 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
                 <label className="block font-semibold text-slate-700 mb-1">Remarks / Note</label>
                 <input
                   type="text"
-                  placeholder="e.g. Paid in cash at counter / Batch 1"
+                  placeholder="e.g. Received at counter"
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600"

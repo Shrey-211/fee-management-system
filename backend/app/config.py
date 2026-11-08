@@ -15,10 +15,6 @@ class Settings(BaseSettings):
     BACKUP_DIR: Path = BASE_DIR / "backups"
     DATABASE_URL: str = f"sqlite:///{BASE_DIR / 'data' / 'fees.db'}"
 
-    # Cash Counter Thresholds
-    CASH_ALERT_THRESHOLD_LOW: float = 40000.0
-    CASH_ALERT_THRESHOLD_HIGH: float = 50000.0
-
     # Default Academic Year
     DEFAULT_ACADEMIC_YEAR: str = "2026-2027"
 
