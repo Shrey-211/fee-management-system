@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { Award, Plus, Search, X } from 'lucide-react';
+import StudentSelect from '../components/StudentSelect';
 
 export default function Scholarships() {
   const [scholarships, setScholarships] = useState([]);
   const [students, setStudents] = useState([]);
   const [feeHeads, setFeeHeads] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
 
   // Form
@@ -86,20 +88,45 @@ export default function Scholarships() {
     'State Minority Scholarship'
   ];
 
+  const filteredScholarships = scholarships.filter((s) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      (s.student_name || '').toLowerCase().includes(q) ||
+      (s.student_code || '').toLowerCase().includes(q) ||
+      (s.scholarship_name || '').toLowerCase().includes(q) ||
+      (s.sanction_order_no || '').toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="space-y-4">
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
         <div>
           <h3 className="text-sm font-bold text-slate-900">Scholarship Receipts Registry</h3>
           <p className="text-xs text-slate-500">Government & institutional scholarship disbursement tracking</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow"
-        >
-          <Plus className="w-4 h-4" />
-          Record Scholarship Credit
-        </button>
+
+        <div className="flex items-center gap-3 w-full md:w-auto flex-1 max-w-md justify-end">
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by student name, ID code, or scheme..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none bg-white"
+            />
+          </div>
+
+          <button
+            onClick={() => setShowModal(true)}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            Record Scholarship Credit
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -123,14 +150,14 @@ export default function Scholarships() {
                     Loading scholarships...
                   </td>
                 </tr>
-              ) : scholarships.length === 0 ? (
+              ) : filteredScholarships.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="px-4 py-8 text-center text-slate-400">
                     No scholarship credits recorded yet.
                   </td>
                 </tr>
               ) : (
-                scholarships.map((s) => (
+                filteredScholarships.map((s) => (
                   <tr key={s.id} className="hover:bg-slate-50/80">
                     <td className="px-4 py-3 text-slate-600">{s.credit_date}</td>
                     <td className="px-4 py-3 font-bold text-slate-900">{s.student_name}</td>
@@ -171,19 +198,13 @@ export default function Scholarships() {
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Select Student *</label>
-                <select
-                  required
+                <StudentSelect
+                  students={students}
                   value={selectedStudentId}
                   onChange={(e) => setSelectedStudentId(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
-                >
-                  <option value="">-- Choose Student --</option>
-                  {students.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.student_code} — {s.full_name} ({s.category})
-                    </option>
-                  ))}
-                </select>
+                  placeholder="-- Search & Choose Student by Name / ID --"
+                  required
+                />
               </div>
 
               <div>

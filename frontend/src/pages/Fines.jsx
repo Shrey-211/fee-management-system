@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { AlertCircle, Plus, Search, Filter, X, CheckCircle } from 'lucide-react';
+import StudentSelect from '../components/StudentSelect';
 
 export default function Fines({ initialStudent, onClearInitialStudent, onSelectStudent, onPayFine }) {
   const [fines, setFines] = useState([]);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
 
   // Form State
@@ -99,15 +101,36 @@ export default function Fines({ initialStudent, onClearInitialStudent, onSelectS
     'Library Overdue Fine'
   ];
 
+  const filteredFines = fines.filter((f) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      (f.student_name || '').toLowerCase().includes(q) ||
+      (f.student_code || '').toLowerCase().includes(q) ||
+      (f.event_name || '').toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="space-y-4">
       {/* Top Filter and Action Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3 w-full md:w-auto">
+        <div className="flex items-center gap-3 w-full md:w-auto flex-1 max-w-lg">
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by student name, ID code, or event..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
+            />
+          </div>
+
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="py-2 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
+            className="py-2 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white shrink-0"
           >
             <option value="">All Fine Statuses</option>
             <option value="UNPAID">UNPAID (Active Dues)</option>
@@ -122,7 +145,7 @@ export default function Fines({ initialStudent, onClearInitialStudent, onSelectS
             setSelectedStudentId('');
             setShowModal(true);
           }}
-          className="w-full md:w-auto px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow"
+          className="w-full md:w-auto px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow shrink-0"
         >
           <Plus className="w-4 h-4" />
           Levy Event Fine
@@ -153,14 +176,14 @@ export default function Fines({ initialStudent, onClearInitialStudent, onSelectS
                     Loading fines registry...
                   </td>
                 </tr>
-              ) : fines.length === 0 ? (
+              ) : filteredFines.length === 0 ? (
                 <tr>
                   <td colSpan="9" className="px-4 py-8 text-center text-slate-400">
                     No fines recorded matching criteria.
                   </td>
                 </tr>
               ) : (
-                fines.map((f) => (
+                filteredFines.map((f) => (
                   <tr key={f.id} className="hover:bg-slate-50/80 transition">
                     <td className="px-4 py-3 text-slate-600">{f.fine_date}</td>
                     <td className="px-4 py-3 font-bold text-slate-900">
@@ -239,19 +262,13 @@ export default function Fines({ initialStudent, onClearInitialStudent, onSelectS
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Select Student *</label>
-                <select
-                  required
+                <StudentSelect
+                  students={students}
                   value={selectedStudentId}
                   onChange={(e) => setSelectedStudentId(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
-                >
-                  <option value="">-- Choose Student --</option>
-                  {students.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.student_code} — {s.full_name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="-- Search & Choose Student by Name / ID --"
+                  required
+                />
               </div>
 
               <div>

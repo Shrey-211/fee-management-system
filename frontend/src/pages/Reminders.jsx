@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
-import { Mail, Send, CheckSquare, Square, Edit3, Clock, CheckCircle2, AlertTriangle, Save } from 'lucide-react';
+import { Mail, Send, CheckSquare, Square, Edit3, Clock, CheckCircle2, AlertTriangle, Save, Search } from 'lucide-react';
 
 export default function Reminders() {
   const [students, setStudents] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [studentSearch, setStudentSearch] = useState('');
 
   // Selection
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
@@ -61,11 +62,26 @@ export default function Reminders() {
     );
   };
 
+  const filteredStudents = students.filter((s) => {
+    if (!studentSearch.trim()) return true;
+    const q = studentSearch.toLowerCase();
+    return (
+      (s.full_name || '').toLowerCase().includes(q) ||
+      (s.student_code || '').toLowerCase().includes(q) ||
+      (s.email_address || '').toLowerCase().includes(q)
+    );
+  });
+
   const toggleSelectAll = () => {
-    if (selectedStudentIds.length === students.length) {
-      setSelectedStudentIds([]);
+    const targetList = studentSearch ? filteredStudents : students;
+    if (targetList.length === 0) return;
+    const allTargetSelected = targetList.every(s => selectedStudentIds.includes(s.id));
+    if (allTargetSelected) {
+      const targetIds = new Set(targetList.map(s => s.id));
+      setSelectedStudentIds(prev => prev.filter(id => !targetIds.has(id)));
     } else {
-      setSelectedStudentIds(students.map(s => s.id));
+      const targetIds = targetList.map(s => s.id);
+      setSelectedStudentIds(prev => Array.from(new Set([...prev, ...targetIds])));
     }
   };
 
@@ -172,15 +188,39 @@ export default function Reminders() {
                   Students with Outstanding Dues & Valid Emails
                 </h3>
                 <p className="text-[11px] text-slate-500">
-                  {students.length} eligible recipients
+                  {students.length} eligible recipients {studentSearch && `(${filteredStudents.length} matching search)`}
                 </p>
               </div>
               <button
+                type="button"
                 onClick={toggleSelectAll}
                 className="text-xs font-semibold text-blue-600 hover:text-blue-800"
               >
-                {selectedStudentIds.length === students.length ? 'Deselect All' : 'Select All'}
+                {filteredStudents.length > 0 && filteredStudents.every(s => selectedStudentIds.includes(s.id))
+                  ? 'Deselect All'
+                  : 'Select All'}
               </button>
+            </div>
+
+            {/* Student Search Bar */}
+            <div className="p-2.5 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+              <Search className="w-4 h-4 text-slate-400 shrink-0" />
+              <input
+                type="text"
+                placeholder="Search recipients by student name, code, or email..."
+                value={studentSearch}
+                onChange={(e) => setStudentSearch(e.target.value)}
+                className="w-full text-xs bg-white px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              {studentSearch && (
+                <button
+                  type="button"
+                  onClick={() => setStudentSearch('')}
+                  className="text-xs text-slate-400 hover:text-slate-600 px-1 font-semibold"
+                >
+                  Clear
+                </button>
+              )}
             </div>
 
             <div className="overflow-x-auto max-h-96 overflow-y-auto">
@@ -200,8 +240,14 @@ export default function Reminders() {
                         No students with pending dues and valid email addresses found.
                       </td>
                     </tr>
+                  ) : filteredStudents.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" className="px-4 py-8 text-center text-slate-400">
+                        No students matching "{studentSearch}".
+                      </td>
+                    </tr>
                   ) : (
-                    students.map((s) => {
+                    filteredStudents.map((s) => {
                       const isChecked = selectedStudentIds.includes(s.id);
                       return (
                         <tr

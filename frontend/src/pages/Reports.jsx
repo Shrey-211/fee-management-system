@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
-import { FileSpreadsheet, Download, Calendar, Filter, ArrowUpDown } from 'lucide-react';
+import { FileSpreadsheet, Download, Calendar, Filter, ArrowUpDown, Search } from 'lucide-react';
 
 export default function Reports({ onSelectStudent }) {
   const [activeReport, setActiveReport] = useState('daily'); // 'daily' | 'outstanding'
@@ -9,10 +9,12 @@ export default function Reports({ onSelectStudent }) {
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [dailyData, setDailyData] = useState(null);
+  const [dailySearch, setDailySearch] = useState('');
   const [loadingDaily, setLoadingDaily] = useState(true);
 
   // Outstanding Report State
   const [students, setStudents] = useState([]);
+  const [studentSearch, setStudentSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [duesOnly, setDuesOnly] = useState(true);
   const [loadingOutstanding, setLoadingOutstanding] = useState(true);
@@ -59,6 +61,27 @@ export default function Reports({ onSelectStudent }) {
   const handleDownloadOutstandingExcel = () => {
     api.downloadOutstandingExcel('2026-2027');
   };
+
+  const filteredDailyItems = (dailyData?.items || []).filter((item) => {
+    if (!dailySearch.trim()) return true;
+    const q = dailySearch.toLowerCase();
+    return (
+      (item.student_name || '').toLowerCase().includes(q) ||
+      (item.student_code || '').toLowerCase().includes(q) ||
+      (item.receipt_no || '').toLowerCase().includes(q) ||
+      (item.physical_receipt_no || '').toLowerCase().includes(q)
+    );
+  });
+
+  const filteredOutstandingStudents = students.filter((s) => {
+    if (!studentSearch.trim()) return true;
+    const q = studentSearch.toLowerCase();
+    return (
+      (s.full_name || '').toLowerCase().includes(q) ||
+      (s.student_code || '').toLowerCase().includes(q) ||
+      (s.mobile_number || '').includes(q)
+    );
+  });
 
   return (
     <div className="space-y-6">
@@ -203,6 +226,22 @@ export default function Reports({ onSelectStudent }) {
 
               {/* Detailed Itemized Table */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="p-3 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="relative flex-1 w-full max-w-sm">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Filter records by student name, ID, or receipt #..."
+                      value={dailySearch}
+                      onChange={(e) => setDailySearch(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none bg-white"
+                    />
+                  </div>
+                  <span className="text-[11px] text-slate-500 font-medium shrink-0 self-end sm:self-center">
+                    Showing {filteredDailyItems.length} of {dailyData.items.length} records
+                  </span>
+                </div>
+
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
@@ -224,8 +263,14 @@ export default function Reports({ onSelectStudent }) {
                             No collection transactions found for this date range.
                           </td>
                         </tr>
+                      ) : filteredDailyItems.length === 0 ? (
+                        <tr>
+                          <td colSpan="8" className="px-4 py-8 text-center text-slate-400">
+                            No collection records matching "{dailySearch}".
+                          </td>
+                        </tr>
                       ) : (
-                        dailyData.items.map((item) => (
+                        filteredDailyItems.map((item) => (
                           <tr key={item.payment_id} className="hover:bg-slate-50/80">
                             <td className="px-4 py-3 text-slate-600">{item.payment_date}</td>
                             <td className="px-4 py-3 font-mono text-slate-400">{item.receipt_no}</td>
@@ -257,11 +302,22 @@ export default function Reports({ onSelectStudent }) {
       {activeReport === 'outstanding' && (
         <div className="space-y-4">
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto flex-1">
+              <div className="relative flex-1 min-w-[200px] max-w-xs">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search student name, code, or phone..."
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none bg-white"
+                />
+              </div>
+
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="py-2 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
+                className="py-1.5 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
               >
                 <option value="">All Categories</option>
                 <option value="OPEN">OPEN</option>
@@ -281,11 +337,17 @@ export default function Reports({ onSelectStudent }) {
                 />
                 Dues &gt; ₹0 Only
               </label>
+
+              {studentSearch && (
+                <span className="text-[11px] text-slate-500 font-medium">
+                  ({filteredOutstandingStudents.length} matching)
+                </span>
+              )}
             </div>
 
             <button
               onClick={handleDownloadOutstandingExcel}
-              className="w-full md:w-auto px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow transition"
+              className="w-full md:w-auto px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow transition shrink-0"
             >
               <Download className="w-4 h-4" />
               Download Outstanding Excel (.xlsx)
@@ -315,8 +377,14 @@ export default function Reports({ onSelectStudent }) {
                         No students with outstanding balances found.
                       </td>
                     </tr>
+                  ) : filteredOutstandingStudents.length === 0 ? (
+                    <tr>
+                      <td colSpan="9" className="px-4 py-8 text-center text-slate-400">
+                        No students found matching "{studentSearch}".
+                      </td>
+                    </tr>
                   ) : (
-                    students.map((s) => (
+                    filteredOutstandingStudents.map((s) => (
                       <tr
                         key={s.id}
                         onClick={() => onSelectStudent && onSelectStudent(s.id)}
