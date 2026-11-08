@@ -84,3 +84,4 @@ def test_dynamic_fee_concession_types_and_waiver_rules():
     assert reapply_res.status_code == 200
     assert reapply_res.json()["status"] == "success"
     assert reapply_res.json()["students_recalculated"] >= 1
+
