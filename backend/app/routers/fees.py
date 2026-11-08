@@ -14,6 +14,7 @@ from ..services.fee_engine import quantize_amount, reapply_all_student_fee_rules
 
 router = APIRouter(prefix="/api/fees", tags=["Fees"])
 
+
 @router.get("/heads", response_model=List[FeeHeadResponse])
 def get_fee_heads(
     academic_year: str = "2026-2027",
@@ -24,6 +25,7 @@ def get_fee_heads(
     if not heads:
         heads = db.query(FeeHead).all()
     return heads
+
 
 @router.post("/heads", response_model=FeeHeadResponse)
 def create_fee_head(
@@ -50,167 +52,6 @@ def create_fee_head(
     db.commit()
     db.refresh(head)
     return head
-
-
-def build_concession_type_response(t: FeeConcessionType) -> dict:
-    rules = []
-    for r in t.head_rules:
-        rules.append({
-            "id": r.id,
-            "fee_head_id": r.fee_head_id,
-            "waiver_percent": r.waiver_percent,
-            "waiver_amount": r.waiver_amount,
-            "reason": r.reason,
-            "fee_head_name": r.fee_head.name if r.fee_head else None,
-            "fee_head_code": r.fee_head.code if r.fee_head else None,
-            "fee_head_base_amount": r.fee_head.base_amount if r.fee_head else None
-        })
-    return {
-        "id": t.id,
-        "name": t.name,
-        "code": t.code,
-        "type_group": t.type_group,
-        "academic_year": t.academic_year,
-        "description": t.description,
-        "is_active": t.is_active,
-        "rules": rules
-    }
-
-
-@router.get("/types", response_model=List[FeeConcessionTypeResponse])
-def get_concession_types(
-    academic_year: Optional[str] = "2026-2027",
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    query = db.query(FeeConcessionType)
-    if academic_year:
-        query = query.filter(FeeConcessionType.academic_year == academic_year)
-    types = query.order_by(FeeConcessionType.type_group.asc(), FeeConcessionType.name.asc()).all()
-    return [build_concession_type_response(t) for t in types]
-
-
-@router.post("/types", response_model=FeeConcessionTypeResponse)
-def create_concession_type(
-    type_in: FeeConcessionTypeCreate,
-    admin: User = Depends(require_admin),
-    db: Session = Depends(get_db)
-):
-    code = type_in.code.strip().upper()
-    existing = db.query(FeeConcessionType).filter(
-        FeeConcessionType.code == code,
-        FeeConcessionType.academic_year == type_in.academic_year
-    ).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Fee type with this code already exists for this academic year")
-
-    c_type = FeeConcessionType(
-        name=type_in.name.strip(),
-        code=code,
-        type_group=type_in.type_group.strip().upper(),
-        academic_year=type_in.academic_year.strip(),
-        description=type_in.description,
-        is_active=type_in.is_active
-    )
-    db.add(c_type)
-    db.flush()
-
-    for r in type_in.rules:
-        rule = FeeTypeHeadRule(
-            concession_type_id=c_type.id,
-            fee_head_id=r.fee_head_id,
-            waiver_percent=quantize_amount(r.waiver_percent),
-            waiver_amount=quantize_amount(r.waiver_amount),
-            reason=r.reason
-        )
-        db.add(rule)
-
-    db.commit()
-    db.refresh(c_type)
-    return build_concession_type_response(c_type)
-
-
-@router.get("/types/{type_id}", response_model=FeeConcessionTypeResponse)
-def get_concession_type(
-    type_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    c_type = db.query(FeeConcessionType).filter(FeeConcessionType.id == type_id).first()
-    if not c_type:
-        raise HTTPException(status_code=404, detail="Fee concession type not found")
-    return build_concession_type_response(c_type)
-
-
-@router.put("/types/{type_id}", response_model=FeeConcessionTypeResponse)
-def update_concession_type(
-    type_id: int,
-    type_in: FeeConcessionTypeUpdate,
-    admin: User = Depends(require_admin),
-    db: Session = Depends(get_db)
-):
-    c_type = db.query(FeeConcessionType).filter(FeeConcessionType.id == type_id).first()
-    if not c_type:
-        raise HTTPException(status_code=404, detail="Fee concession type not found")
-
-    if type_in.name is not None:
-        c_type.name = type_in.name.strip()
-    if type_in.code is not None:
-        c_type.code = type_in.code.strip().upper()
-    if type_in.type_group is not None:
-        c_type.type_group = type_in.type_group.strip().upper()
-    if type_in.academic_year is not None:
-        c_type.academic_year = type_in.academic_year.strip()
-    if type_in.description is not None:
-        c_type.description = type_in.description
-    if type_in.is_active is not None:
-        c_type.is_active = type_in.is_active
-
-    if type_in.rules is not None:
-        # Replace existing head rules
-        db.query(FeeTypeHeadRule).filter(FeeTypeHeadRule.concession_type_id == type_id).delete()
-        for r in type_in.rules:
-            rule = FeeTypeHeadRule(
-                concession_type_id=type_id,
-                fee_head_id=r.fee_head_id,
-                waiver_percent=quantize_amount(r.waiver_percent),
-                waiver_amount=quantize_amount(r.waiver_amount),
-                reason=r.reason
-            )
-            db.add(rule)
-
-    db.commit()
-    db.refresh(c_type)
-    return build_concession_type_response(c_type)
-
-
-@router.delete("/types/{type_id}")
-def delete_concession_type(
-    type_id: int,
-    admin: User = Depends(require_admin),
-    db: Session = Depends(get_db)
-):
-    c_type = db.query(FeeConcessionType).filter(FeeConcessionType.id == type_id).first()
-    if not c_type:
-        raise HTTPException(status_code=404, detail="Fee concession type not found")
-    db.delete(c_type)
-    db.commit()
-    return {"status": "deleted", "id": type_id}
-
-
-@router.post("/reapply-rules")
-def reapply_fee_rules(
-    academic_year: Optional[str] = "2026-2027",
-    admin: User = Depends(require_admin),
-    db: Session = Depends(get_db)
-):
-    count = reapply_all_student_fee_rules(db, academic_year=academic_year)
-    return {
-        "status": "success",
-        "academic_year": academic_year,
-        "students_recalculated": count,
-        "message": f"Successfully re-evaluated and updated fee rules for {count} students."
-    }
 
 
 @router.put("/heads/{head_id}", response_model=FeeHeadResponse)
@@ -355,7 +196,6 @@ def update_concession_type(
         c_type.is_active = type_in.is_active
 
     if type_in.rules is not None:
-        # Replace existing head rules
         db.query(FeeTypeHeadRule).filter(FeeTypeHeadRule.concession_type_id == type_id).delete()
         for r in type_in.rules:
             rule = FeeTypeHeadRule(
@@ -399,5 +239,3 @@ def reapply_fee_rules(
         "students_recalculated": count,
         "message": f"Successfully re-evaluated and updated fee rules for {count} students."
     }
-
-

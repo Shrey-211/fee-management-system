@@ -70,7 +70,7 @@ if frontend_dist.exists() and (frontend_dist / "index.html").exists():
     async def serve_spa(full_path: str, request: Request):
         # Don't intercept API routes
         if full_path.startswith("api/"):
-            return None
+            raise HTTPException(status_code=404, detail="API endpoint not found")
         file_path = frontend_dist / full_path
         if file_path.is_file():
             return FileResponse(file_path)
