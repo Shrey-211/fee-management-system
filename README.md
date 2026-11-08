@@ -39,23 +39,30 @@ The system comes pre-seeded with three role-based accounts:
 
 ## 3. Fee Structure & Rule Engine
 
-The system applies deterministic rules configured per academic year:
-- **Tuition Fee**: Standard ₹40,000.00
-  - **100% Waived** for all Female students (*Girl Student Scheme*).
-  - **100% Waived** for all SC and ST students.
-  - **50% Discount** for EBC category students (Tuition payable: ₹20,000.00).
-- **Development Fee**: Standard ₹15,000.00
-  - **100% Waived** for SC and ST students.
-  - Fully applicable (₹15,000.00) to Open, EBC, OBC, and Girl students.
-- **Compulsory Fees** (Applicable to all students regardless of category or gender):
+The system supports configurable fee heads and fully customizable **Fee Concession Types** configured per academic year:
+- **Base Fee Heads**:
+  - **Tuition Fee**: Standard ₹40,000.00
+  - **Development Fee**: Standard ₹15,000.00
   - **Dress Code Fee**: ₹3,000.00
   - **University Examination Fee**: ₹2,000.00
   - **Other Charges (Send-off, Welcome, Party contributions)**: ₹1,000.00
 
-### Overlapping Waiver Resolution
-- **SC/ST Girl Student**: Receives 100% waiver on both Tuition and Development fees.
-- **EBC Girl Student**: 100% Girl waiver on Tuition takes precedence over the 50% EBC discount. Development fee remains payable at ₹15,000.00.
-- All non-applicable charges explicitly display `₹0.00` alongside their waiver reason.
+### Dynamic Fee Concession Types & Waiver Matrix
+Administrators can configure or add custom fee types in **Settings**:
+- **Caste / Social Categories (`CASTE`)**:
+  - `OPEN`: Standard 0% waiver across all fee heads.
+  - `EBC`: Configurable (defaults to 50% Tuition discount, ₹20,000.00 payable).
+  - `SC` & `ST`: Configurable (defaults to 100% Tuition & Development waiver).
+  - `OBC`, `VJNT`, `NT`, `SBC`, etc.: Fully customizable.
+- **Gender-Based Rules (`GENDER`)**:
+  - `FEMALE`: Configurable (defaults to 100% Tuition waiver under the Girl Student Scheme).
+  - `MALE`: Standard applicable fees.
+- **Special / Custom Quotas (`CUSTOM`)**:
+  - Create custom quotas such as `TFWS` (Tuition Fee Waiver Scheme), `SPORTS` (Sports Quota), `STAFF_WARD`, or `HANDICAPPED`.
+- **Waiver Precedence & Overlapping Resolution**:
+  - The fee engine automatically resolves overlapping rules by awarding the **highest applicable waiver** per fee head (e.g. an EBC Girl student receives 100% girl student tuition waiver instead of 50%).
+  - Non-applicable and waived charges explicitly display `₹0.00` alongside their scheme reason on student ledger statements.
+  - One-click **"Recalculate All Student Fees"** allows administrators to re-evaluate all enrolled students whenever fee rules are updated.
 
 ---
 
