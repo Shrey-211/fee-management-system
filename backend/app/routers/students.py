@@ -41,6 +41,8 @@ def build_student_response(student: Student) -> dict:
         "academic_year": student.academic_year,
         "course_branch": student.course_branch,
         "current_year": student.current_year,
+        "concession_type_id": student.concession_type_id,
+        "concession_type_name": student.concession_type.name if student.concession_type else None,
         "is_active": student.is_active,
         "created_at": student.created_at,
         "total_fee": total_fee,
@@ -102,6 +104,7 @@ def create_student(
         dob=student_in.dob,
         gender=student_in.gender.strip().upper(),
         category=student_in.category.strip().upper(),
+        concession_type_id=student_in.concession_type_id,
         mobile_number=student_in.mobile_number.strip() if student_in.mobile_number else None,
         email_address=student_in.email_address.strip() if student_in.email_address else None,
         address=student_in.address,
@@ -249,6 +252,9 @@ def update_student(
         category_or_gender_changed = True
     if student_in.category is not None and student_in.category.strip().upper() != student.category:
         student.category = student_in.category.strip().upper()
+        category_or_gender_changed = True
+    if student_in.concession_type_id is not None and student_in.concession_type_id != student.concession_type_id:
+        student.concession_type_id = student_in.concession_type_id if student_in.concession_type_id != 0 else None
         category_or_gender_changed = True
     if student_in.mobile_number is not None:
         student.mobile_number = student_in.mobile_number.strip()

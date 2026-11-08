@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 from .database import engine, SessionLocal, Base
 from .models import (
     User, FeeHead, StudentFeeHead, Student, Fine, 
-    Payment, PaymentItem, EmailTemplate
+    Payment, PaymentItem, EmailTemplate,
+    FeeConcessionType, FeeTypeHeadRule
 )
 from .auth import get_password_hash
 from .services.fee_engine import initialize_student_fees, quantize_amount
@@ -95,6 +96,155 @@ def seed_database():
             db.add_all(fee_heads)
             db.commit()
             print("Standard fee heads seeded.")
+
+        # Safe SQLite column check for concession_type_id on students table
+        try:
+            raw_conn = db.connection().connection
+            cursor = raw_conn.cursor()
+            cursor.execute("PRAGMA table_info(students)")
+            cols = [row[1] for row in cursor.fetchall()]
+            if cols and "concession_type_id" not in cols:
+                print("Adding concession_type_id column to students table...")
+                cursor.execute("ALTER TABLE students ADD COLUMN concession_type_id INTEGER REFERENCES fee_concession_types(id)")
+                db.commit()
+        except Exception as e:
+            print("Column migration notice:", e)
+
+        # 3. Seed Fee Concession Types & Head Rules
+        if db.query(FeeConcessionType).count() == 0:
+            print("Seeding standard fee concession types and head waiver rules...")
+            heads = {h.code: h.id for h in db.query(FeeHead).filter(FeeHead.academic_year == "2026-2027").all()}
+            if not heads:
+                heads = {h.code: h.id for h in db.query(FeeHead).all()}
+
+            def create_type_with_rules(name, code, group, desc, rules_dict):
+                ctype = FeeConcessionType(
+                    name=name,
+                    code=code,
+                    type_group=group,
+                    academic_year="2026-2027",
+                    description=desc,
+                    is_active=True
+                )
+                db.add(ctype)
+                db.flush()
+                for h_code, (pct, reason) in rules_dict.items():
+                    if h_code in heads:
+                        rule = FeeTypeHeadRule(
+                            concession_type_id=ctype.id,
+                            fee_head_id=heads[h_code],
+                            waiver_percent=Decimal(str(pct)),
+                            waiver_amount=Decimal("0.00"),
+                            reason=reason
+                        )
+                        db.add(rule)
+
+            # 1. Gender Types
+            create_type_with_rules(
+                "Female / Girl Student", "FEMALE", "GENDER",
+                "Girl Student Scheme (100% Tuition Waiver)",
+                {
+                    "TUITION": (100.0, "100% Waived (Girl Student Scheme)"),
+                    "DEVELOPMENT": (0.0, "Applicable Development Fee"),
+                    "DRESS_CODE": (0.0, "Compulsory Fee (Applicable to all)"),
+                    "EXAM": (0.0, "Compulsory Fee (Applicable to all)"),
+                    "OTHER": (0.0, "Compulsory Fee (Applicable to all)")
+                }
+            )
+            create_type_with_rules(
+                "Male / General", "MALE", "GENDER",
+                "General Male Student (Standard Fees)",
+                {
+                    "TUITION": (0.0, "Standard Tuition Fee"),
+                    "DEVELOPMENT": (0.0, "Applicable Development Fee"),
+                    "DRESS_CODE": (0.0, "Compulsory Fee (Applicable to all)"),
+                    "EXAM": (0.0, "Compulsory Fee (Applicable to all)"),
+                    "OTHER": (0.0, "Compulsory Fee (Applicable to all)")
+                }
+            )
+
+            # 2. Caste / Category Types
+            create_type_with_rules(
+                "OPEN (General Category)", "OPEN", "CASTE",
+                "Open Category (Standard Fees)",
+                {
+                    "TUITION": (0.0, "Standard Tuition Fee"),
+                    "DEVELOPMENT": (0.0, "Applicable Development Fee"),
+                    "DRESS_CODE": (0.0, "Compulsory Fee (Applicable to all)"),
+                    "EXAM": (0.0, "Compulsory Fee (Applicable to all)"),
+                    "OTHER": (0.0, "Compulsory Fee (Applicable to all)")
+                }
+            )
+            create_type_with_rules(
+                "EBC (Economically Backward Class)", "EBC", "CASTE",
+                "EBC Scheme (50% Tuition Discount)",
+                {
+                    "TUITION": (50.0, "50% Discount (EBC Scheme)"),
+                    "DEVELOPMENT": (0.0, "Applicable Development Fee"),
+                    "DRESS_CODE": (0.0, "Compulsory Fee (Applicable to all)"),
+                    "EXAM": (0.0, "Compulsory Fee (Applicable to all)"),
+                    "OTHER": (0.0, "Compulsory Fee (Applicable to all)")
+                }
+            )
+            create_type_with_rules(
+                "SC (Scheduled Caste)", "SC", "CASTE",
+                "SC Category Scheme (100% Tuition & Development Waived)",
+                {
+                    "TUITION": (100.0, "100% Waived (SC Category Scheme)"),
+                    "DEVELOPMENT": (100.0, "100% Waived (SC Category Scheme)"),
+                    "DRESS_CODE": (0.0, "Compulsory Fee (Applicable to all)"),
+                    "EXAM": (0.0, "Compulsory Fee (Applicable to all)"),
+                    "OTHER": (0.0, "Compulsory Fee (Applicable to all)")
+                }
+            )
+            create_type_with_rules(
+                "ST (Scheduled Tribe)", "ST", "CASTE",
+                "ST Category Scheme (100% Tuition & Development Waived)",
+                {
+                    "TUITION": (100.0, "100% Waived (ST Category Scheme)"),
+                    "DEVELOPMENT": (100.0, "100% Waived (ST Category Scheme)"),
+                    "DRESS_CODE": (0.0, "Compulsory Fee (Applicable to all)"),
+                    "EXAM": (0.0, "Compulsory Fee (Applicable to all)"),
+                    "OTHER": (0.0, "Compulsory Fee (Applicable to all)")
+                }
+            )
+            create_type_with_rules(
+                "OBC (Other Backward Class)", "OBC", "CASTE",
+                "OBC Category",
+                {
+                    "TUITION": (0.0, "Standard Tuition Fee"),
+                    "DEVELOPMENT": (0.0, "Applicable Development Fee"),
+                    "DRESS_CODE": (0.0, "Compulsory Fee (Applicable to all)"),
+                    "EXAM": (0.0, "Compulsory Fee (Applicable to all)"),
+                    "OTHER": (0.0, "Compulsory Fee (Applicable to all)")
+                }
+            )
+            create_type_with_rules(
+                "VJNT (Vimukta Jati & Nomadic Tribes)", "VJNT", "CASTE",
+                "VJNT Category",
+                {
+                    "TUITION": (0.0, "Standard Tuition Fee"),
+                    "DEVELOPMENT": (0.0, "Applicable Development Fee"),
+                    "DRESS_CODE": (0.0, "Compulsory Fee (Applicable to all)"),
+                    "EXAM": (0.0, "Compulsory Fee (Applicable to all)"),
+                    "OTHER": (0.0, "Compulsory Fee (Applicable to all)")
+                }
+            )
+
+            # 3. Custom / Special Types
+            create_type_with_rules(
+                "TFWS (Tuition Fee Waiver Scheme)", "TFWS", "CUSTOM",
+                "State TFWS Allotment (100% Tuition Waived)",
+                {
+                    "TUITION": (100.0, "100% Waived (TFWS Scheme)"),
+                    "DEVELOPMENT": (0.0, "Applicable Development Fee"),
+                    "DRESS_CODE": (0.0, "Compulsory Fee (Applicable to all)"),
+                    "EXAM": (0.0, "Compulsory Fee (Applicable to all)"),
+                    "OTHER": (0.0, "Compulsory Fee (Applicable to all)")
+                }
+            )
+            db.commit()
+            print("Standard fee concession types and head waiver rules seeded.")
 
         # 3. Seed Default Email Template
         if db.query(EmailTemplate).count() == 0:

@@ -13,6 +13,7 @@ class StudentBase(BaseModel):
     dob: Optional[date] = None
     gender: str = Field(..., description="MALE, FEMALE, OTHER")
     category: str = Field(..., description="OPEN, EBC, SC, ST, OBC, VJNT, NT, SBC")
+    concession_type_id: Optional[int] = None
     mobile_number: Optional[str] = None
     email_address: Optional[str] = None
     address: Optional[str] = None
@@ -29,6 +30,7 @@ class StudentUpdate(BaseModel):
     dob: Optional[date] = None
     gender: Optional[str] = None
     category: Optional[str] = None
+    concession_type_id: Optional[int] = None
     mobile_number: Optional[str] = None
     email_address: Optional[str] = None
     address: Optional[str] = None
@@ -40,6 +42,7 @@ class StudentUpdate(BaseModel):
 class StudentResponse(StudentBase):
     id: int
     is_active: bool
+    concession_type_name: Optional[str] = None
     total_fee: Decimal = Decimal("0.00")
     total_waiver: Decimal = Decimal("0.00")
     net_fee_due: Decimal = Decimal("0.00")

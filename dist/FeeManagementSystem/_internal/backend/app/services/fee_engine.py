@@ -1,8 +1,8 @@
 from decimal import Decimal, ROUND_HALF_UP
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from sqlalchemy.orm import Session
 from ..models.student import Student
-from ..models.fee import FeeHead, StudentFeeHead
+from ..models.fee import FeeHead, StudentFeeHead, FeeConcessionType, FeeTypeHeadRule
 from ..models.payment import PaymentItem, Payment
 from ..models.fine import Fine
 from ..models.scholarship import ScholarshipCredit
@@ -18,23 +18,83 @@ def quantize_amount(val: Decimal | float | int | str) -> Decimal:
 def calculate_fee_waiver(
     fee_head: FeeHead,
     gender: str,
-    category: str
+    category: str,
+    concession_type_id: Optional[int] = None,
+    db: Optional[Session] = None
 ) -> Tuple[Decimal, Decimal, str]:
     """
-    Evaluates discount percent, discount amount, and reason based on PRD requirements:
-    - Dress-code, University Exam, and Other charges are applicable to all students (0% discount).
-    - Tuition is waived (100%) for Girls.
-    - Tuition and Development fees are waived (100%) for SC/ST students.
-    - Development fees apply to other categories.
-    - EBC students receive 50% discount on Tuition.
-    - Overlapping resolution: SC/ST takes precedence; Girls 100% waiver takes precedence over EBC 50%.
+    Evaluates discount percent, discount amount, and reason.
+    Priority 1: Evaluates dynamic FeeConcessionType rules configured in Settings.
+    Priority 2: Fallback to college baseline rules if dynamic types are not yet populated.
     """
     base = quantize_amount(fee_head.base_amount)
     code = (fee_head.code or "").upper().strip()
     gender = (gender or "").upper().strip()
     category = (category or "").upper().strip()
 
-    # Compulsory non-waiver fee heads: Dress Code, University Exam, Other charges
+    # 1. Attempt dynamic evaluation from configured FeeConcessionType & FeeTypeHeadRule
+    if db is not None:
+        try:
+            # Fetch active concession types
+            types = db.query(FeeConcessionType).filter(
+                FeeConcessionType.is_active == True,
+                FeeConcessionType.academic_year == fee_head.academic_year
+            ).all()
+
+            if not types:
+                types = db.query(FeeConcessionType).filter(FeeConcessionType.is_active == True).all()
+
+            applicable_types = []
+            for t in types:
+                t_code = (t.code or "").upper().strip()
+                t_group = (t.type_group or "").upper().strip()
+
+                if t_group == "GENDER":
+                    if t_code == gender or (gender == "FEMALE" and ("GIRL" in t_code or "FEMALE" in t_code)):
+                        applicable_types.append(t)
+                elif t_group == "CASTE":
+                    if t_code == category:
+                        applicable_types.append(t)
+                    elif category in ["SC", "ST"] and t_code in ["SC", "ST", "SC/ST", "SC_ST"]:
+                        applicable_types.append(t)
+                elif t_group == "CUSTOM":
+                    if concession_type_id and t.id == concession_type_id:
+                        applicable_types.append(t)
+
+            if applicable_types:
+                # Find maximum discount across all applicable types for this fee head
+                best_discount = Decimal("0.00")
+                best_pct = Decimal("0.00")
+                best_reason = None
+
+                for app_type in applicable_types:
+                    for rule in app_type.head_rules:
+                        if rule.fee_head_id == fee_head.id:
+                            rule_pct = quantize_amount(rule.waiver_percent)
+                            pct_disc = quantize_amount(base * (rule_pct / Decimal("100.00")))
+                            fix_disc = quantize_amount(rule.waiver_amount or 0)
+                            disc = max(pct_disc, fix_disc)
+                            if rule_pct >= Decimal("100.00") or disc >= base:
+                                disc = base
+                                rule_pct = Decimal("100.00")
+
+                            if disc > best_discount or (disc == best_discount and best_reason is None):
+                                best_discount = disc
+                                best_pct = rule_pct
+                                best_reason = rule.reason or f"{rule_pct}% Waived ({app_type.name})"
+
+                if best_discount > Decimal("0.00"):
+                    return best_pct, best_discount, best_reason or f"{best_pct}% Waived"
+                elif not fee_head.allows_waiver or code in ["DRESS_CODE", "EXAM", "OTHER", "DRESS"]:
+                    return Decimal("0.00"), Decimal("0.00"), "Compulsory Fee (Applicable to all)"
+                else:
+                    return Decimal("0.00"), Decimal("0.00"), best_reason or "Standard Fee"
+        except Exception as e:
+            # Fall back to default deterministic rules on error
+            pass
+
+    # 2. Fallback to baseline default PRD rules
+    # Compulsory non-waiver fee heads
     if not fee_head.allows_waiver or code in ["DRESS_CODE", "EXAM", "OTHER", "DRESS"]:
         return Decimal("0.00"), Decimal("0.00"), "Compulsory Fee (Applicable to all)"
 
@@ -90,7 +150,9 @@ def initialize_student_fees(student: Student, db: Session) -> List[StudentFeeHea
         discount_pct, discount_amt, reason = calculate_fee_waiver(
             fee_head=fh,
             gender=student.gender,
-            category=student.category
+            category=student.category,
+            concession_type_id=getattr(student, 'concession_type_id', None),
+            db=db
         )
         base = quantize_amount(fh.base_amount)
         net = quantize_amount(base - discount_amt)
@@ -168,4 +230,21 @@ def recalculate_student_balances(student_id: int, db: Session):
             fine.status = "UNPAID"
 
     db.commit()
+
+
+def reapply_all_student_fee_rules(db: Session, academic_year: Optional[str] = None) -> int:
+    """
+    Recalculates fee heads and balances for all enrolled students based on updated fee types and heads.
+    Returns the count of updated students.
+    """
+    query = db.query(Student).filter(Student.is_active == True)
+    if academic_year:
+        query = query.filter(Student.academic_year == academic_year)
+    students = query.all()
+    for s in students:
+        initialize_student_fees(s, db)
+        recalculate_student_balances(s.id, db)
+    db.commit()
+    return len(students)
+
 

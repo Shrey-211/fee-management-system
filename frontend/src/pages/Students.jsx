@@ -13,6 +13,7 @@ export default function Students({ onSelectStudent }) {
   const [gender, setGender] = useState('');
   const [hasDuesOnly, setHasDuesOnly] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [feeTypes, setFeeTypes] = useState([]);
 
   // New Student Form State
   const [formData, setFormData] = useState({
@@ -21,6 +22,7 @@ export default function Students({ onSelectStudent }) {
     dob: '',
     gender: 'MALE',
     category: 'OPEN',
+    concession_type_id: null,
     mobile_number: '',
     email_address: '',
     address: '',
@@ -30,6 +32,12 @@ export default function Students({ onSelectStudent }) {
   });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+
+  useEffect(() => {
+    api.getFeeTypes('2026-2027')
+      .then(types => setFeeTypes(types || []))
+      .catch(() => {});
+  }, []);
 
   const loadStudents = async () => {
     setLoading(true);
@@ -308,27 +316,61 @@ export default function Students({ onSelectStudent }) {
                     onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
                   >
-                    <option value="MALE">Male</option>
-                    <option value="FEMALE">Female (100% Tuition Waived)</option>
-                    <option value="OTHER">Other</option>
+                    {feeTypes.filter(t => t.type_group === 'GENDER').length > 0 ? (
+                      feeTypes.filter(t => t.type_group === 'GENDER').map(t => (
+                        <option key={t.id} value={t.code}>{t.name}</option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="MALE">Male</option>
+                        <option value="FEMALE">Female (100% Tuition Waived)</option>
+                        <option value="OTHER">Other</option>
+                      </>
+                    )}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Category / Quota *</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Caste / Social Category *</label>
                   <select
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
                   >
-                    <option value="OPEN">OPEN (Standard Fee)</option>
-                    <option value="EBC">EBC (50% Tuition Discount)</option>
-                    <option value="SC">SC (100% Tuition & Dev Waived)</option>
-                    <option value="ST">ST (100% Tuition & Dev Waived)</option>
-                    <option value="OBC">OBC</option>
-                    <option value="VJNT">VJNT</option>
+                    {feeTypes.filter(t => t.type_group === 'CASTE').length > 0 ? (
+                      feeTypes.filter(t => t.type_group === 'CASTE').map(t => (
+                        <option key={t.id} value={t.code}>{t.name}</option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="OPEN">OPEN (Standard Fee)</option>
+                        <option value="EBC">EBC (50% Tuition Discount)</option>
+                        <option value="SC">SC (100% Tuition & Dev Waived)</option>
+                        <option value="ST">ST (100% Tuition & Dev Waived)</option>
+                        <option value="OBC">OBC</option>
+                        <option value="VJNT">VJNT</option>
+                      </>
+                    )}
                   </select>
                 </div>
+
+                {feeTypes.filter(t => t.type_group === 'CUSTOM').length > 0 && (
+                  <div className="md:col-span-2">
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Special Fee Concession Quota (Optional)
+                    </label>
+                    <select
+                      value={formData.concession_type_id || ''}
+                      onChange={(e) => setFormData({ ...formData, concession_type_id: e.target.value ? parseInt(e.target.value) : null })}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
+                    >
+                      <option value="">-- None / Standard Rules --</option>
+                      {feeTypes.filter(t => t.type_group === 'CUSTOM').map(t => (
+                        <option key={t.id} value={t.id}>{t.name} ({t.code})</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Date of Birth</label>

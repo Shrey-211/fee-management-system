@@ -2,19 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { 
   ArrowLeft, Receipt, Plus, AlertCircle, 
-  Mail, Award, CheckCircle, Clock, FileText, Phone, MapPin 
+  Mail, Award, CheckCircle, Clock, FileText, Phone, MapPin, Edit3, X 
 } from 'lucide-react';
 
 export default function StudentDetail({ studentId, onBack, onRecordPayment, onLevyFine }) {
   const [student, setStudent] = useState(null);
+  const [feeTypes, setFeeTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [emailStatus, setEmailStatus] = useState('');
+
+  // Edit Profile Modal
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState('');
 
   const loadStudent = async () => {
     setLoading(true);
     try {
-      const data = await api.getStudent(studentId);
+      const [data, types] = await Promise.all([
+        api.getStudent(studentId),
+        api.getFeeTypes('2026-2027').catch(() => [])
+      ]);
       setStudent(data);
+      setFeeTypes(types || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -25,6 +36,42 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
   useEffect(() => {
     loadStudent();
   }, [studentId]);
+
+  const handleOpenEdit = () => {
+    if (!student) return;
+    setEditForm({
+      full_name: student.full_name,
+      gender: student.gender,
+      category: student.category,
+      concession_type_id: student.concession_type_id || '',
+      mobile_number: student.mobile_number || '',
+      email_address: student.email_address || '',
+      address: student.address || '',
+      course_branch: student.course_branch || '',
+      current_year: student.current_year || 1
+    });
+    setEditError('');
+    setShowEditModal(true);
+  };
+
+  const handleSaveEditSubmit = async (e) => {
+    e.preventDefault();
+    setSavingEdit(true);
+    setEditError('');
+    try {
+      const payload = {
+        ...editForm,
+        concession_type_id: editForm.concession_type_id ? parseInt(editForm.concession_type_id) : 0
+      };
+      await api.updateStudent(student.id, payload);
+      setShowEditModal(false);
+      loadStudent();
+    } catch (err) {
+      setEditError(err.message);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const handleSendReminder = async () => {
     setEmailStatus('Sending reminder email...');
@@ -74,6 +121,14 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
         </button>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleOpenEdit}
+            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-slate-300 shadow-sm transition"
+          >
+            <Edit3 className="w-3.5 h-3.5 text-slate-600" />
+            Edit Profile & Types
+          </button>
+
           {student.email_address && Number(student.overall_balance) > 0 && (
             <button
               onClick={handleSendReminder}
@@ -379,6 +434,160 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
           </table>
         </div>
       </div>
+
+      {/* Edit Student Profile & Types Modal */}
+      {showEditModal && editForm && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold">Edit Student Profile & Fee Types</h3>
+                <p className="text-[11px] text-slate-400 font-mono">
+                  {student.student_code} — {student.full_name}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto text-xs">
+              {editError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg font-medium">
+                  {editError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="md:col-span-2">
+                  <label className="block font-semibold text-slate-700 mb-1">Full Student Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.full_name}
+                    onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Gender *</label>
+                  <select
+                    value={editForm.gender}
+                    onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
+                  >
+                    {feeTypes.filter(t => t.type_group === 'GENDER').length > 0 ? (
+                      feeTypes.filter(t => t.type_group === 'GENDER').map(t => (
+                        <option key={t.id} value={t.code}>{t.name}</option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="MALE">Male</option>
+                        <option value="FEMALE">Female</option>
+                        <option value="OTHER">Other</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Caste / Category *</label>
+                  <select
+                    value={editForm.category}
+                    onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
+                  >
+                    {feeTypes.filter(t => t.type_group === 'CASTE').length > 0 ? (
+                      feeTypes.filter(t => t.type_group === 'CASTE').map(t => (
+                        <option key={t.id} value={t.code}>{t.name}</option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="OPEN">OPEN</option>
+                        <option value="EBC">EBC</option>
+                        <option value="SC">SC</option>
+                        <option value="ST">ST</option>
+                        <option value="OBC">OBC</option>
+                        <option value="VJNT">VJNT</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Special Concession Quota (Optional)
+                  </label>
+                  <select
+                    value={editForm.concession_type_id}
+                    onChange={(e) => setEditForm({ ...editForm, concession_type_id: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
+                  >
+                    <option value="">-- None / Standard Rules --</option>
+                    {feeTypes.filter(t => t.type_group === 'CUSTOM').map(t => (
+                      <option key={t.id} value={t.id}>{t.name} ({t.code})</option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Changing Gender or Caste/Type will automatically re-evaluate all fee heads and update the student ledger.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Mobile Number</label>
+                  <input
+                    type="tel"
+                    value={editForm.mobile_number}
+                    onChange={(e) => setEditForm({ ...editForm, mobile_number: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    value={editForm.email_address}
+                    onChange={(e) => setEditForm({ ...editForm, email_address: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block font-semibold text-slate-700 mb-1">Residential Address</label>
+                  <input
+                    type="text"
+                    value={editForm.address}
+                    onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 border rounded-lg text-slate-600 hover:bg-slate-100 font-semibold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow transition disabled:opacity-50"
+                >
+                  {savingEdit ? 'Saving & Recalculating...' : 'Save & Update Ledger'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

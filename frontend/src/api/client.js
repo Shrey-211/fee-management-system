@@ -90,6 +90,22 @@ export const api = {
     method: 'PUT',
     body: JSON.stringify(data)
   }),
+  getFeeTypes: (academicYear) => request(`/fees/types${academicYear ? `?academic_year=${academicYear}` : ''}`),
+  getFeeType: (id) => request(`/fees/types/${id}`),
+  createFeeType: (data) => request('/fees/types', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  updateFeeType: (id, data) => request(`/fees/types/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
+  deleteFeeType: (id) => request(`/fees/types/${id}`, {
+    method: 'DELETE'
+  }),
+  reapplyFeeRules: (academicYear) => request(`/fees/reapply-rules${academicYear ? `?academic_year=${academicYear}` : ''}`, {
+    method: 'POST'
+  }),
 
   // Payments
   getPayments: (params = {}) => {

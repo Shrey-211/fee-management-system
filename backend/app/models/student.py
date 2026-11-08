@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, Date, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, Date, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from ..database import Base
 
@@ -18,10 +18,12 @@ class Student(Base):
     academic_year = Column(String(20), nullable=False, default="2026-2027")
     course_branch = Column(String(100), nullable=True, default="General")
     current_year = Column(Integer, default=1)
+    concession_type_id = Column(Integer, ForeignKey("fee_concession_types.id", ondelete="SET NULL"), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
+    concession_type = relationship("FeeConcessionType")
     fee_heads = relationship("StudentFeeHead", back_populates="student", cascade="all, delete-orphan")
     payments = relationship("Payment", back_populates="student", cascade="all, delete-orphan")
     fines = relationship("Fine", back_populates="student", cascade="all, delete-orphan")

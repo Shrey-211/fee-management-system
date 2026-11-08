@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { 
   Settings as SettingsIcon, Database, Shield, 
-  Mail, Users, Download, Plus, CheckCircle, RefreshCw, Save 
+  Mail, Users, Download, Plus, CheckCircle, RefreshCw, Save,
+  Layers, Edit2, Trash2, X, AlertTriangle, ArrowRight, Check
 } from 'lucide-react';
 
 export default function Settings({ user }) {
@@ -12,6 +13,21 @@ export default function Settings({ user }) {
   const [feeHeads, setFeeHeads] = useState([]);
   const [editingHead, setEditingHead] = useState(null);
   const [headAmount, setHeadAmount] = useState('');
+
+  // Fee Concession Types
+  const [feeTypes, setFeeTypes] = useState([]);
+  const [typeFilter, setTypeFilter] = useState('ALL'); // 'ALL' | 'CASTE' | 'GENDER' | 'CUSTOM'
+  const [showTypeModal, setShowTypeModal] = useState(false);
+  const [editingType, setEditingType] = useState(null);
+  const [typeFormName, setTypeFormName] = useState('');
+  const [typeFormCode, setTypeFormCode] = useState('');
+  const [typeFormGroup, setTypeFormGroup] = useState('CASTE');
+  const [typeFormDesc, setTypeFormDesc] = useState('');
+  const [typeHeadRules, setTypeHeadRules] = useState({});
+  const [savingType, setSavingType] = useState(false);
+  const [typeError, setTypeError] = useState('');
+  const [reapplyingRules, setReapplyingRules] = useState(false);
+  const [reapplyMsg, setReapplyMsg] = useState('');
 
   // Backups
   const [backups, setBackups] = useState([]);
@@ -40,15 +56,17 @@ export default function Settings({ user }) {
 
   const loadData = async () => {
     try {
-      const [heads, bList, uList, smtp] = await Promise.all([
+      const [heads, bList, uList, smtp, types] = await Promise.all([
         api.getFeeHeads('2026-2027'),
         api.getBackups(),
         api.getUsers(),
-        api.getSmtpSettings()
+        api.getSmtpSettings(),
+        api.getFeeTypes('2026-2027')
       ]);
       setFeeHeads(heads);
       setBackups(bList);
       setUserList(uList);
+      setFeeTypes(types || []);
 
       setSmtpHost(smtp.smtp_host || '');
       setSmtpPort(smtp.smtp_port || 587);
@@ -58,6 +76,149 @@ export default function Settings({ user }) {
       setSmtpTls(smtp.smtp_use_tls !== false);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleOpenAddType = () => {
+    setEditingType(null);
+    setTypeFormName('');
+    setTypeFormCode('');
+    setTypeFormGroup('CASTE');
+    setTypeFormDesc('');
+    setTypeError('');
+
+    // Prepopulate rules mapping for every fee head with 0% waiver
+    const rulesMap = {};
+    feeHeads.forEach(h => {
+      rulesMap[h.id] = {
+        waiver_percent: '0',
+        waiver_amount: '0',
+        reason: ''
+      };
+    });
+    setTypeHeadRules(rulesMap);
+    setShowTypeModal(true);
+  };
+
+  const handleOpenEditType = (type) => {
+    setEditingType(type);
+    setTypeFormName(type.name);
+    setTypeFormCode(type.code);
+    setTypeFormGroup(type.type_group || 'CASTE');
+    setTypeFormDesc(type.description || '');
+    setTypeError('');
+
+    const rulesMap = {};
+    feeHeads.forEach(h => {
+      const existingRule = (type.rules || []).find(r => r.fee_head_id === h.id);
+      rulesMap[h.id] = {
+        waiver_percent: existingRule ? String(existingRule.waiver_percent) : '0',
+        waiver_amount: existingRule ? String(existingRule.waiver_amount) : '0',
+        reason: existingRule ? (existingRule.reason || '') : ''
+      };
+    });
+    setTypeHeadRules(rulesMap);
+    setShowTypeModal(true);
+  };
+
+  const handleRuleChange = (headId, field, val) => {
+    setTypeHeadRules(prev => ({
+      ...prev,
+      [headId]: {
+        ...prev[headId],
+        [field]: val
+      }
+    }));
+  };
+
+  const handleApplyPreset = (headId, percent, defaultReason) => {
+    setTypeHeadRules(prev => ({
+      ...prev,
+      [headId]: {
+        ...prev[headId],
+        waiver_percent: String(percent),
+        waiver_amount: '0',
+        reason: defaultReason
+      }
+    }));
+  };
+
+  const handleSaveTypeSubmit = async (e) => {
+    e.preventDefault();
+    if (!typeFormName.trim() || !typeFormCode.trim()) {
+      setTypeError('Name and Code are required');
+      return;
+    }
+    setSavingType(true);
+    setTypeError('');
+
+    try {
+      const rulesList = Object.entries(typeHeadRules).map(([headId, r]) => ({
+        fee_head_id: parseInt(headId),
+        waiver_percent: parseFloat(r.waiver_percent) || 0,
+        waiver_amount: parseFloat(r.waiver_amount) || 0,
+        reason: r.reason ? r.reason.trim() : null
+      }));
+
+      const payload = {
+        name: typeFormName.trim(),
+        code: typeFormCode.trim().toUpperCase(),
+        type_group: typeFormGroup,
+        academic_year: '2026-2027',
+        description: typeFormDesc.trim(),
+        is_active: true,
+        rules: rulesList
+      };
+
+      if (editingType) {
+        await api.updateFeeType(editingType.id, payload);
+      } else {
+        await api.createFeeType(payload);
+      }
+
+      setShowTypeModal(false);
+      // Reload types and auto-reapply fee rules to all students
+      const updatedTypes = await api.getFeeTypes('2026-2027');
+      setFeeTypes(updatedTypes);
+      
+      // Auto re-evaluate enrolled students with new rules
+      await api.reapplyFeeRules('2026-2027');
+      setReapplyMsg(`Fee Type "${payload.name}" saved! All student ledgers have been re-evaluated with updated waiver rules.`);
+      setTimeout(() => setReapplyMsg(''), 7000);
+    } catch (err) {
+      setTypeError(err.message);
+    } finally {
+      setSavingType(false);
+    }
+  };
+
+  const handleDeleteType = async (typeId, typeName) => {
+    if (!window.confirm(`Are you sure you want to delete the Fee Type "${typeName}"?`)) {
+      return;
+    }
+    try {
+      await api.deleteFeeType(typeId);
+      const updatedTypes = await api.getFeeTypes('2026-2027');
+      setFeeTypes(updatedTypes);
+      await api.reapplyFeeRules('2026-2027');
+      setReapplyMsg(`Fee Type deleted and student ledgers updated.`);
+      setTimeout(() => setReapplyMsg(''), 5000);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleManualReapplyRules = async () => {
+    setReapplyingRules(true);
+    setReapplyMsg('');
+    try {
+      const res = await api.reapplyFeeRules('2026-2027');
+      setReapplyMsg(`Success: ${res.message}`);
+      setTimeout(() => setReapplyMsg(''), 6000);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setReapplyingRules(false);
     }
   };
 
@@ -299,6 +460,157 @@ export default function Settings({ user }) {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* 1.2 FEE CONCESSION TYPES & WAIVER MATRIX */}
+          <div className="pt-6 border-t border-slate-200 space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-indigo-600" />
+                  Student Categories & Fee Concession Types (Waiver Rules)
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Define what gets waived or applied for each category (e.g. Girls, SC/ST, EBC, Open, TFWS) across all fee heads.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleManualReapplyRules}
+                  disabled={reapplyingRules}
+                  title="Re-calculate all enrolled students using current waiver rules"
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition border border-slate-300 disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${reapplyingRules ? 'animate-spin text-blue-600' : ''}`} />
+                  {reapplyingRules ? 'Recalculating...' : 'Recalculate All Student Fees'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleOpenAddType}
+                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow transition"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Add New Fee Type
+                </button>
+              </div>
+            </div>
+
+            {reapplyMsg && (
+              <div className="p-3 bg-blue-50 border border-blue-200 text-blue-800 text-xs rounded-xl flex items-center gap-2 font-medium">
+                <CheckCircle className="w-4 h-4 text-blue-600 shrink-0" />
+                {reapplyMsg}
+              </div>
+            )}
+
+            {/* Type Group Filter Tabs */}
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-2 text-xs">
+              <span className="text-slate-400 font-semibold text-[11px] uppercase mr-1">Filter Types:</span>
+              {[
+                { key: 'ALL', label: `All Types (${feeTypes.length})` },
+                { key: 'CASTE', label: `Caste / Category (${feeTypes.filter(t => t.type_group === 'CASTE').length})` },
+                { key: 'GENDER', label: `Gender Rules (${feeTypes.filter(t => t.type_group === 'GENDER').length})` },
+                { key: 'CUSTOM', label: `Special / Custom (${feeTypes.filter(t => t.type_group === 'CUSTOM').length})` }
+              ].map(tab => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setTypeFilter(tab.key)}
+                  className={`px-2.5 py-1 rounded-md font-semibold transition ${
+                    typeFilter === tab.key
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Types Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {feeTypes
+                .filter(t => typeFilter === 'ALL' || t.type_group === typeFilter)
+                .map(t => (
+                  <div
+                    key={t.id}
+                    className="p-4 bg-slate-50/60 rounded-xl border border-slate-200 shadow-sm space-y-3 hover:border-slate-300 transition"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900 text-xs">{t.name}</span>
+                          <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">
+                            {t.code}
+                          </span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                            t.type_group === 'CASTE'
+                              ? 'bg-purple-100 text-purple-800'
+                              : t.type_group === 'GENDER'
+                              ? 'bg-rose-100 text-rose-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {t.type_group}
+                          </span>
+                        </div>
+                        {t.description && (
+                          <p className="text-[11px] text-slate-500 mt-1">{t.description}</p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditType(t)}
+                          title="Edit Waiver Rules for this Type"
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        {t.type_group === 'CUSTOM' && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteType(t.id, t.name)}
+                            title="Delete Fee Type"
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Breakdown across fee heads */}
+                    <div className="bg-white p-2.5 rounded-lg border border-slate-200/80 space-y-1.5 text-[11px]">
+                      <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                        Configured Waivers by Fee Head:
+                      </div>
+                      {feeHeads.map(h => {
+                        const rule = (t.rules || []).find(r => r.fee_head_id === h.id);
+                        const pct = rule ? Number(rule.waiver_percent) : 0;
+                        const amt = rule ? Number(rule.waiver_amount) : 0;
+                        const isWaived = pct > 0 || amt > 0;
+                        return (
+                          <div key={h.id} className="flex items-center justify-between py-0.5">
+                            <span className="text-slate-600 truncate max-w-[170px]">{h.name}:</span>
+                            <span className={`font-mono font-bold ${isWaived ? 'text-emerald-700' : 'text-slate-400'}`}>
+                              {pct >= 100
+                                ? '100% Waived (₹0 Net)'
+                                : pct > 0
+                                ? `${pct}% Waived`
+                                : amt > 0
+                                ? `₹${amt} Discount`
+                                : '0% (Full Fee)'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+            </div>
           </div>
         </div>
       )}
@@ -611,6 +923,202 @@ export default function Settings({ user }) {
                 {testingSmtp ? 'Sending Test...' : 'Send Test Email'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. MODAL: ADD / EDIT FEE CONCESSION TYPE */}
+      {showTypeModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden animate-in fade-in-50 duration-150 max-h-[90vh] flex flex-col">
+            <div className="bg-slate-900 text-white p-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold">
+                  {editingType ? `Edit Fee Concession Type: ${editingType.name}` : 'Create New Fee Concession Type'}
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Configure waiver percentage (%) or fixed discount for each fee head
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTypeModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveTypeSubmit} className="p-6 overflow-y-auto space-y-4 text-xs">
+              {typeError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg font-medium">
+                  {typeError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Type Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. EBC or Girl Student"
+                    value={typeFormName}
+                    onChange={(e) => setTypeFormName(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Code / Identifier *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. EBC or FEMALE"
+                    value={typeFormCode}
+                    onChange={(e) => setTypeFormCode(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 font-mono font-bold uppercase"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Type Group *</label>
+                  <select
+                    value={typeFormGroup}
+                    onChange={(e) => setTypeFormGroup(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 bg-white font-semibold"
+                  >
+                    <option value="CASTE">Caste / Social Category</option>
+                    <option value="GENDER">Gender-Based Rule</option>
+                    <option value="CUSTOM">Special / Custom Quota</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Description / Notes</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 50% discount on Tuition fee for Economically Backward Class"
+                  value={typeFormDesc}
+                  onChange={(e) => setTypeFormDesc(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+
+              {/* Fee Heads Waiver Rules Matrix */}
+              <div className="pt-2">
+                <label className="block font-bold text-slate-800 mb-2 uppercase text-[11px] tracking-wider">
+                  Fee Heads Waiver & Concession Matrix:
+                </label>
+                <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100">
+                  {feeHeads.map((head) => {
+                    const rule = typeHeadRules[head.id] || { waiver_percent: '0', waiver_amount: '0', reason: '' };
+                    const baseAmt = Number(head.base_amount);
+                    const pct = Number(rule.waiver_percent) || 0;
+                    const discountAmt = Math.min(baseAmt, (baseAmt * (pct / 100)));
+                    const netAmt = Math.max(0, baseAmt - discountAmt);
+
+                    return (
+                      <div key={head.id} className="p-3 bg-slate-50/50 hover:bg-slate-50 transition space-y-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div>
+                            <span className="font-bold text-slate-900">{head.name}</span>
+                            <span className="text-slate-500 font-mono text-[11px] ml-2">
+                              (Base: ₹{baseAmt.toLocaleString('en-IN')})
+                            </span>
+                            {!head.allows_waiver && (
+                              <span className="ml-2 text-[10px] px-1.5 py-0.2 bg-amber-50 text-amber-700 border border-amber-200 rounded font-semibold">
+                                Typically Compulsory
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Quick Presets */}
+                          <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                            <span className="text-[10px] text-slate-400 font-semibold mr-1">Presets:</span>
+                            <button
+                              type="button"
+                              onClick={() => handleApplyPreset(head.id, 100, `100% Waived (${typeFormName || 'Scheme'})`)}
+                              className="px-2 py-0.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[10px] font-bold rounded"
+                            >
+                              100% Waived
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleApplyPreset(head.id, 50, `50% Discount (${typeFormName || 'Scheme'})`)}
+                              className="px-2 py-0.5 bg-blue-100 hover:bg-blue-200 text-blue-800 text-[10px] font-bold rounded"
+                            >
+                              50% Discount
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleApplyPreset(head.id, 0, `Standard Fee`)}
+                              className="px-2 py-0.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-bold rounded"
+                            >
+                              0% (Full Fee)
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Waiver Percentage (%)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              value={rule.waiver_percent}
+                              onChange={(e) => handleRuleChange(head.id, 'waiver_percent', e.target.value)}
+                              className="w-full px-2.5 py-1.5 border rounded-lg focus:ring-1 focus:ring-blue-600 font-mono font-bold text-xs bg-white"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Calculated Net Due</label>
+                            <div className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono">
+                              <span className="font-bold text-slate-900">₹{netAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                              {discountAmt > 0 && (
+                                <span className="text-emerald-600 text-[10px] ml-1.5">(-₹{discountAmt.toLocaleString('en-IN')})</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Reason / Display Note</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 50% EBC Discount"
+                              value={rule.reason}
+                              onChange={(e) => handleRuleChange(head.id, 'reason', e.target.value)}
+                              className="w-full px-2.5 py-1.5 border rounded-lg focus:ring-1 focus:ring-blue-600 text-xs bg-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowTypeModal(false)}
+                  className="px-4 py-2 border rounded-lg text-slate-600 hover:bg-slate-100 font-semibold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingType}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow transition disabled:opacity-50"
+                >
+                  {savingType ? 'Saving & Applying...' : (editingType ? 'Save & Apply Rules' : 'Create & Apply Type')}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

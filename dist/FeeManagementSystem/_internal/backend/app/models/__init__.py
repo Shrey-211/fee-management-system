@@ -1,5 +1,5 @@
 from .user import User
-from .fee import FeeHead, StudentFeeHead
+from .fee import FeeHead, StudentFeeHead, FeeConcessionType, FeeTypeHeadRule
 from .student import Student
 from .fine import Fine
 from .payment import Payment, PaymentItem
@@ -11,6 +11,8 @@ __all__ = [
     "User",
     "FeeHead",
     "StudentFeeHead",
+    "FeeConcessionType",
+    "FeeTypeHeadRule",
     "Student",
     "Fine",
     "Payment",
