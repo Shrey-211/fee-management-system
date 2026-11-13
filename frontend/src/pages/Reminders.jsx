@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { Mail, Send, CheckSquare, Square, Edit3, Clock, CheckCircle2, AlertTriangle, Save, Search } from 'lucide-react';
+import ModalDialog from '../components/ModalDialog';
 
 export default function Reminders() {
   const [students, setStudents] = useState([]);
@@ -12,6 +13,10 @@ export default function Reminders() {
   // Selection
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
   const [targetDueDate, setTargetDueDate] = useState('Within 7 Days');
+
+  // Custom Dialog States
+  const [confirmSendDialog, setConfirmSendDialog] = useState(false);
+  const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '', type: 'info' });
 
   // Template Editing
   const [selectedTemplate, setSelectedTemplate] = useState(null);
@@ -87,27 +92,56 @@ export default function Reminders() {
 
   const handleSaveTemplate = async () => {
     if (!selectedTemplate) return;
+
+    const trimmedSubject = (subject || '').trim();
+    const trimmedBody = (body || '').trim();
+
+    if (!trimmedSubject || !trimmedBody) {
+      setAlertModal({
+        isOpen: true,
+        type: 'warning',
+        title: 'Missing Template Content',
+        message: 'Please fill in both the Subject line and Body Template text before saving.'
+      });
+      return;
+    }
+
     setSavingTemplate(true);
     setTemplateSavedMsg('');
     try {
       await api.updateTemplate(selectedTemplate.id, {
-        subject: subject.trim(),
-        body_template: body
+        subject: trimmedSubject,
+        body_template: trimmedBody
       });
       setTemplateSavedMsg('Template saved successfully!');
       setTimeout(() => setTemplateSavedMsg(''), 4000);
     } catch (e) {
-      alert(e.message || 'Failed to save template');
+      setAlertModal({
+        isOpen: true,
+        type: 'danger',
+        title: 'Save Failed',
+        message: e.message || 'Failed to save email template.'
+      });
     } finally {
       setSavingTemplate(false);
     }
   };
 
-  const handleSendReminders = async () => {
+  const handleOpenSendConfirm = () => {
     if (selectedStudentIds.length === 0) {
-      alert('Please select at least one student');
+      setAlertModal({
+        isOpen: true,
+        type: 'warning',
+        title: 'No Students Selected',
+        message: 'Please select at least one student from the recipient list before dispatching reminders.'
+      });
       return;
     }
+    setConfirmSendDialog(true);
+  };
+
+  const handleExecuteSend = async () => {
+    setConfirmSendDialog(false);
     setSending(true);
     setDispatchResult(null);
     try {
@@ -120,7 +154,12 @@ export default function Reminders() {
       const lList = await api.getReminderLogs();
       setLogs(lList);
     } catch (e) {
-      alert(e.message || 'Error triggering reminder dispatch');
+      setAlertModal({
+        isOpen: true,
+        type: 'danger',
+        title: 'Dispatch Failed',
+        message: e.message || 'Error triggering reminder dispatch.'
+      });
     } finally {
       setSending(false);
     }
@@ -148,7 +187,7 @@ export default function Reminders() {
             className="px-3 py-1.5 text-xs border rounded-lg focus:ring-2 focus:ring-blue-600"
           />
           <button
-            onClick={handleSendReminders}
+            onClick={handleOpenSendConfirm}
             disabled={sending || selectedStudentIds.length === 0}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow transition disabled:opacity-50"
           >
@@ -392,6 +431,31 @@ export default function Reminders() {
           </table>
         </div>
       </div>
+
+      {/* Confirm Send Reminders Modal */}
+      <ModalDialog
+        isOpen={confirmSendDialog}
+        type="info"
+        title="Confirm Reminder Dispatch"
+        message={`Are you sure you want to dispatch fee dues reminder emails to ${selectedStudentIds.length} selected student(s) via the college SMTP mailbox?`}
+        confirmText={`Yes, Dispatch (${selectedStudentIds.length}) Reminders`}
+        cancelText="Cancel"
+        confirmVariant="primary"
+        loading={sending}
+        onConfirm={handleExecuteSend}
+        onClose={() => setConfirmSendDialog(false)}
+      />
+
+      {/* Action / Error Notification Modal */}
+      <ModalDialog
+        isOpen={alertModal.isOpen}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        confirmText="Close"
+        confirmVariant={alertModal.type === 'danger' ? 'danger' : (alertModal.type === 'warning' ? 'warning' : 'primary')}
+        onClose={() => setAlertModal({ isOpen: false, title: '', message: '', type: 'info' })}
+      />
     </div>
   );
 }

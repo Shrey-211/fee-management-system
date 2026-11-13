@@ -52,10 +52,11 @@ def record_payment(
     mode = payment_in.payment_mode.upper().strip()
 
     internal_receipt = generate_internal_receipt_no(db, student.academic_year)
+    phys_receipt = (payment_in.physical_receipt_no or "").strip()
 
     payment = Payment(
         internal_receipt_no=internal_receipt,
-        physical_receipt_no=payment_in.physical_receipt_no.strip(),
+        physical_receipt_no=phys_receipt,
         student_id=student.id,
         payment_date=pay_date,
         entry_date=ent_date,

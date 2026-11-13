@@ -133,8 +133,24 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
     e.preventDefault();
     setFormError('');
 
-    if (!physicalReceiptNo.trim()) {
-      setFormError('Please enter the physical receipt book number');
+    if (!selectedStudentId) {
+      setFormError('Please select a student (*).');
+      return;
+    }
+
+    const trimmedReceipt = (physicalReceiptNo || '').trim();
+
+    if (!paymentDate) {
+      setFormError('Receipt Date (*) is required. Please select the date.');
+      return;
+    }
+
+    let hasNegative = false;
+    Object.values({ ...headAllocations, ...fineAllocations }).forEach(v => {
+      if (parseFloat(v) < 0) hasNegative = true;
+    });
+    if (hasNegative) {
+      setFormError('Allocation amounts cannot be negative. Please enter valid positive amounts.');
       return;
     }
 
@@ -154,7 +170,7 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
     });
 
     if (items.length === 0) {
-      setFormError('Please allocate an amount to at least one fee head or fine');
+      setFormError('Please allocate an amount greater than ₹0 to at least one fee head or fine.');
       return;
     }
 
@@ -162,10 +178,10 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
     try {
       await api.createPayment({
         student_id: parseInt(selectedStudentId),
-        physical_receipt_no: physicalReceiptNo.trim(),
+        physical_receipt_no: trimmedReceipt || null,
         payment_date: paymentDate,
         payment_mode: mode,
-        remarks: remarks.trim() || null,
+        remarks: (remarks || '').trim() || null,
         items
       });
       setShowModal(false);
@@ -173,7 +189,7 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
       setRemarks('');
       loadPayments();
     } catch (err) {
-      setFormError(err.message || 'Payment entry failed');
+      setFormError(err.message || 'Payment entry failed. Please check input values.');
     } finally {
       setSubmitting(false);
     }
@@ -266,7 +282,7 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
                   <tr key={p.id} className="hover:bg-slate-50/80 transition">
                     <td className="px-4 py-3 text-slate-600">{p.payment_date}</td>
                     <td className="px-4 py-3 font-mono font-black text-blue-900 bg-blue-50/30">
-                      {p.physical_receipt_no}
+                      {p.physical_receipt_no || <span className="text-slate-400 font-normal italic">—</span>}
                     </td>
                     <td className="px-4 py-3 font-mono text-slate-400">{p.internal_receipt_no}</td>
                     <td className="px-4 py-3">
@@ -343,12 +359,11 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Manual Receipt Book # *
+                    Manual Receipt Book # <span className="text-slate-400 font-normal">(Optional)</span>
                   </label>
                   <input
                     type="text"
-                    required
-                    placeholder="e.g. BOOK-12 / 0459"
+                    placeholder="e.g. BOOK-12 / 0459 (optional)"
                     value={physicalReceiptNo}
                     onChange={(e) => setPhysicalReceiptNo(e.target.value)}
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 font-mono font-bold"

@@ -4,7 +4,9 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.encoders import jsonable_encoder
 from .config import settings
 from .seed import seed_database
 from .services.backup_service import perform_sqlite_backup
@@ -18,6 +20,49 @@ app = FastAPI(
     version=settings.VERSION,
     description="Offline-First Student Fee Management System for Single PC / Local Network"
 )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    field_labels = {
+        "student_code": "Student ID / Roll Code",
+        "full_name": "Full Student Name",
+        "dob": "Date of Birth",
+        "gender": "Gender",
+        "category": "Caste / Social Category",
+        "concession_type_id": "Special Concession Quota",
+        "physical_receipt_no": "Manual Receipt Book #",
+        "payment_date": "Receipt Date",
+        "payment_mode": "Payment Mode",
+        "fine_date": "Date Levied",
+        "credit_date": "Credit Date",
+        "event_name": "Event / Reason",
+        "amount": "Amount",
+        "base_amount": "Fee Amount",
+        "old_password": "Current Password",
+        "new_password": "New Password",
+    }
+    messages = []
+    for err in exc.errors():
+        loc = err.get("loc", [])
+        raw_field = str(loc[-1]) if loc else "field"
+        label = field_labels.get(raw_field, raw_field.replace("_", " ").title())
+        err_type = str(err.get("type", "")).lower()
+        msg = str(err.get("msg", ""))
+
+        if "missing" in err_type or "required" in msg.lower():
+            messages.append(f"'{label}' is required. Please fill in all required fields.")
+        elif "date" in err_type or "date" in msg.lower():
+            messages.append(f"'{label}' must be a valid date (or leave empty if optional).")
+        elif "greater_than" in err_type or "greater than 0" in msg.lower():
+            messages.append(f"'{label}' must be greater than 0.")
+        else:
+            messages.append(f"'{label}': {msg}")
+
+    clean_detail = " | ".join(messages) if messages else "Invalid input. Please fill all required fields properly."
+    return JSONResponse(
+        status_code=422,
+        content=jsonable_encoder({"detail": clean_detail, "errors": exc.errors()})
+    )
 
 # Enable CORS for local Vite development
 app.add_middleware(

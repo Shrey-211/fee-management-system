@@ -1,7 +1,7 @@
 from typing import Optional, List
 from decimal import Decimal
 from datetime import date, datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from .fee import StudentFeeHeadResponse
 from .fine import FineResponse
 from .payment import PaymentResponse
@@ -21,6 +21,27 @@ class StudentBase(BaseModel):
     course_branch: Optional[str] = "General"
     current_year: int = 1
 
+    @field_validator("dob", mode="before")
+    @classmethod
+    def coerce_empty_dob(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
+
+    @field_validator("concession_type_id", mode="before")
+    @classmethod
+    def coerce_concession_type(cls, v):
+        if v == "" or v is None or v == 0:
+            return None
+        return v
+
+    @field_validator("mobile_number", "email_address", "address", mode="before")
+    @classmethod
+    def coerce_empty_strings(cls, v):
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
 class StudentCreate(StudentBase):
     pass
 
@@ -38,6 +59,27 @@ class StudentUpdate(BaseModel):
     course_branch: Optional[str] = None
     current_year: Optional[int] = None
     is_active: Optional[bool] = None
+
+    @field_validator("dob", mode="before")
+    @classmethod
+    def coerce_empty_dob(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
+
+    @field_validator("concession_type_id", mode="before")
+    @classmethod
+    def coerce_concession_type(cls, v):
+        if v == "" or v is None or v == 0:
+            return None
+        return v
+
+    @field_validator("mobile_number", "email_address", "address", mode="before")
+    @classmethod
+    def coerce_empty_strings(cls, v):
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
 
 class StudentResponse(StudentBase):
     id: int

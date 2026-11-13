@@ -47,13 +47,26 @@ export default function Scholarships() {
   const handleRecordScholarship = async (e) => {
     e.preventDefault();
     setFormError('');
+
     if (!selectedStudentId) {
-      setFormError('Please select a student');
+      setFormError('Please select a student (*).');
       return;
     }
+
+    const trimmedScheme = (scholarshipName || '').trim();
+    if (!trimmedScheme) {
+      setFormError('Scholarship Scheme Name (*) is required. Please fill in this field.');
+      return;
+    }
+
     const amt = parseFloat(amount);
     if (isNaN(amt) || amt <= 0) {
-      setFormError('Please enter a valid scholarship amount');
+      setFormError('Scholarship Amount (₹) (*) must be greater than 0.');
+      return;
+    }
+
+    if (!creditDate) {
+      setFormError('Credit Date (*) is required. Please select the date.');
       return;
     }
 
@@ -62,11 +75,11 @@ export default function Scholarships() {
       await api.createScholarship({
         student_id: parseInt(selectedStudentId),
         fee_head_id: feeHeadId ? parseInt(feeHeadId) : null,
-        scholarship_name: scholarshipName.trim(),
-        sanction_order_no: sanctionOrderNo.trim() || null,
+        scholarship_name: trimmedScheme,
+        sanction_order_no: (sanctionOrderNo || '').trim() || null,
         credit_date: creditDate,
         amount: amt,
-        remarks: remarks.trim() || null
+        remarks: (remarks || '').trim() || null
       });
       setShowModal(false);
       setAmount('');
@@ -74,7 +87,7 @@ export default function Scholarships() {
       setRemarks('');
       loadData();
     } catch (err) {
-      setFormError(err.message || 'Failed to record scholarship credit');
+      setFormError(err.message || 'Failed to record scholarship credit. Please check input fields.');
     } finally {
       setSubmitting(false);
     }

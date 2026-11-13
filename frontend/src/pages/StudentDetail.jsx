@@ -4,12 +4,17 @@ import {
   ArrowLeft, Receipt, Plus, AlertCircle, 
   Mail, Award, CheckCircle, Clock, FileText, Phone, MapPin, Edit3, X 
 } from 'lucide-react';
+import ModalDialog from '../components/ModalDialog';
 
 export default function StudentDetail({ studentId, onBack, onRecordPayment, onLevyFine }) {
   const [student, setStudent] = useState(null);
   const [feeTypes, setFeeTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [emailStatus, setEmailStatus] = useState('');
+
+  // Waive Dialog & Alert States
+  const [waiveDialog, setWaiveDialog] = useState({ isOpen: false, fine: null, loading: false });
+  const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '', type: 'info' });
 
   // Edit Profile Modal
   const [showEditModal, setShowEditModal] = useState(false);
@@ -56,18 +61,31 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
 
   const handleSaveEditSubmit = async (e) => {
     e.preventDefault();
-    setSavingEdit(true);
     setEditError('');
+
+    const trimmedName = (editForm.full_name || '').trim();
+    if (!trimmedName) {
+      setEditError('Full Student Name (*) is required. Please fill in this field.');
+      return;
+    }
+
+    const payload = {
+      ...editForm,
+      full_name: trimmedName,
+      concession_type_id: editForm.concession_type_id ? parseInt(editForm.concession_type_id) : null,
+      mobile_number: (editForm.mobile_number || '').trim() || null,
+      email_address: (editForm.email_address || '').trim() || null,
+      address: (editForm.address || '').trim() || null,
+      course_branch: (editForm.course_branch || '').trim() || null
+    };
+
+    setSavingEdit(true);
     try {
-      const payload = {
-        ...editForm,
-        concession_type_id: editForm.concession_type_id ? parseInt(editForm.concession_type_id) : 0
-      };
       await api.updateStudent(student.id, payload);
       setShowEditModal(false);
       loadStudent();
     } catch (err) {
-      setEditError(err.message);
+      setEditError(err.message || 'Failed to update student profile.');
     } finally {
       setSavingEdit(false);
     }
@@ -91,13 +109,25 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
     setTimeout(() => setEmailStatus(''), 6000);
   };
 
-  const handleWaiveFine = async (fineId) => {
-    if (!window.confirm('Are you sure you want to waive this fine?')) return;
+  const handleOpenWaiveFine = (fine) => {
+    setWaiveDialog({ isOpen: true, fine, loading: false });
+  };
+
+  const handleConfirmWaiveFine = async () => {
+    if (!waiveDialog.fine) return;
+    setWaiveDialog(prev => ({ ...prev, loading: true }));
     try {
-      await api.updateFine(fineId, { status: 'WAIVED', remarks: 'Waived by administrative authority' });
+      await api.updateFine(waiveDialog.fine.id, { status: 'WAIVED', remarks: 'Waived by administrative authority' });
+      setWaiveDialog({ isOpen: false, fine: null, loading: false });
       loadStudent();
     } catch (e) {
-      alert(e.message);
+      setWaiveDialog({ isOpen: false, fine: null, loading: false });
+      setAlertModal({
+        isOpen: true,
+        type: 'danger',
+        title: 'Action Failed',
+        message: e.message || 'Failed to waive fine.'
+      });
     }
   };
 
@@ -356,7 +386,7 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
                     <td className="px-4 py-3 text-center">
                       {f.status !== 'PAID' && f.status !== 'WAIVED' && (
                         <button
-                          onClick={() => handleWaiveFine(f.id)}
+                          onClick={() => handleOpenWaiveFine(f)}
                           className="text-[11px] text-rose-600 hover:text-rose-800 font-medium underline"
                         >
                           Waive Fine
@@ -408,7 +438,7 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
                 student.payments.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50/60">
                     <td className="px-4 py-3 text-slate-700">{p.payment_date}</td>
-                    <td className="px-4 py-3 font-mono font-bold text-slate-900">{p.physical_receipt_no}</td>
+                    <td className="px-4 py-3 font-mono font-bold text-slate-900">{p.physical_receipt_no || '—'}</td>
                     <td className="px-4 py-3 font-mono text-slate-400">{p.internal_receipt_no}</td>
                     <td className="px-4 py-3">
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
@@ -588,6 +618,35 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
           </div>
         </div>
       )}
+
+      {/* Waive Fine Confirmation Modal */}
+      <ModalDialog
+        isOpen={waiveDialog.isOpen}
+        type="warning"
+        title="Confirm Fine Waiver"
+        message={
+          waiveDialog.fine
+            ? `Are you sure you want to officially waive the fine of ₹${Number(waiveDialog.fine.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })} for "${waiveDialog.fine.event_name}"? The balance will be zeroed out on this student's ledger.`
+            : 'Are you sure you want to officially waive this fine?'
+        }
+        confirmText="Yes, Waive Fine"
+        cancelText="Cancel"
+        confirmVariant="warning"
+        loading={waiveDialog.loading}
+        onConfirm={handleConfirmWaiveFine}
+        onClose={() => setWaiveDialog({ isOpen: false, fine: null, loading: false })}
+      />
+
+      {/* Action / Error Notification Modal */}
+      <ModalDialog
+        isOpen={alertModal.isOpen}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        confirmText="Close"
+        confirmVariant={alertModal.type === 'danger' ? 'danger' : 'primary'}
+        onClose={() => setAlertModal({ isOpen: false, title: '', message: '', type: 'info' })}
+      />
     </div>
   );
 }

@@ -1,10 +1,17 @@
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 class LoginRequest(BaseModel):
-    username: str
-    password: str
+    username: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=1)
+
+    @field_validator("username", mode="before")
+    @classmethod
+    def trim_username(cls, v):
+        if isinstance(v, str):
+            return v.strip()
+        return v
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -16,6 +23,13 @@ class UserCreate(BaseModel):
     password: str = Field(..., min_length=4)
     full_name: str = Field(..., min_length=2, max_length=100)
     role: str = Field(default="clerk")  # admin, accountant, clerk
+
+    @field_validator("username", "full_name", mode="before")
+    @classmethod
+    def trim_strings(cls, v):
+        if isinstance(v, str):
+            return v.strip()
+        return v
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None

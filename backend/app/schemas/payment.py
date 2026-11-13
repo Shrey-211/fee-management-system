@@ -1,7 +1,7 @@
 from typing import Optional, List
 from decimal import Decimal
 from datetime import date, datetime
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 class PaymentItemCreate(BaseModel):
     fee_head_id: Optional[int] = None
@@ -20,19 +20,40 @@ class PaymentItemResponse(BaseModel):
 
 class PaymentCreate(BaseModel):
     student_id: int
-    physical_receipt_no: str = Field(..., min_length=1, description="Number from manual receipt book")
+    physical_receipt_no: Optional[str] = Field(default=None, description="Optional number from manual receipt book")
     payment_date: Optional[date] = None
     entry_date: Optional[date] = None
     payment_mode: str = Field(default="CASH", description="CASH, UPI, CHEQUE, DD, NEFT")
     remarks: Optional[str] = None
     items: List[PaymentItemCreate]
 
+    @field_validator("physical_receipt_no", mode="before")
+    @classmethod
+    def coerce_empty_physical_receipt(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
+
+    @field_validator("payment_date", "entry_date", mode="before")
+    @classmethod
+    def coerce_empty_date(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
+
+    @field_validator("remarks", mode="before")
+    @classmethod
+    def coerce_empty_remarks(cls, v):
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
 class PaymentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     internal_receipt_no: str
-    physical_receipt_no: str
+    physical_receipt_no: Optional[str] = None
     student_id: int
     student_name: Optional[str] = None
     student_code: Optional[str] = None

@@ -67,9 +67,38 @@ export default function Students({ onSelectStudent }) {
   const handleCreateStudent = async (e) => {
     e.preventDefault();
     setFormError('');
+
+    const trimmedCode = (formData.student_code || '').trim();
+    const trimmedName = (formData.full_name || '').trim();
+
+    if (!trimmedCode && !trimmedName) {
+      setFormError('Please fill in all required fields (*): Student ID / Roll Code and Full Student Name.');
+      return;
+    }
+    if (!trimmedCode) {
+      setFormError('Student ID / Roll Code (*) is required. Please fill in this field.');
+      return;
+    }
+    if (!trimmedName) {
+      setFormError('Full Student Name (*) is required. Please fill in this field.');
+      return;
+    }
+
+    const payload = {
+      ...formData,
+      student_code: trimmedCode,
+      full_name: trimmedName,
+      dob: formData.dob && formData.dob.trim() ? formData.dob.trim() : null,
+      concession_type_id: formData.concession_type_id ? parseInt(formData.concession_type_id) : null,
+      mobile_number: (formData.mobile_number || '').trim() || null,
+      email_address: (formData.email_address || '').trim() || null,
+      address: (formData.address || '').trim() || null,
+      course_branch: (formData.course_branch || '').trim() || 'General'
+    };
+
     setSubmitting(true);
     try {
-      const created = await api.createStudent(formData);
+      const created = await api.createStudent(payload);
       setShowAddModal(false);
       setFormData({
         student_code: '',
@@ -77,6 +106,7 @@ export default function Students({ onSelectStudent }) {
         dob: '',
         gender: 'MALE',
         category: 'OPEN',
+        concession_type_id: null,
         mobile_number: '',
         email_address: '',
         address: '',
@@ -87,7 +117,7 @@ export default function Students({ onSelectStudent }) {
       loadStudents();
       onSelectStudent(created.id);
     } catch (err) {
-      setFormError(err.message || 'Failed to enroll student');
+      setFormError(err.message || 'Failed to enroll student. Please check input fields.');
     } finally {
       setSubmitting(false);
     }

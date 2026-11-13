@@ -13,6 +13,7 @@ import Reminders from './pages/Reminders';
 import Settings from './pages/Settings';
 import { api } from './api/client';
 import { X, KeyRound } from 'lucide-react';
+import ModalDialog from './components/ModalDialog';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -20,6 +21,9 @@ export default function App() {
   const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [studentForPayment, setStudentForPayment] = useState(null);
   const [studentForFine, setStudentForFine] = useState(null);
+
+  // Logout Confirm State
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // Change Password Modal
   const [showPwdModal, setShowPwdModal] = useState(false);
@@ -44,6 +48,7 @@ export default function App() {
   }, []);
 
   const handleLogout = () => {
+    setShowLogoutConfirm(false);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
@@ -54,6 +59,24 @@ export default function App() {
     e.preventDefault();
     setPwdMsg('');
     setPwdError('');
+
+    if (!oldPassword) {
+      setPwdError('Current password is required. Please fill in your current password.');
+      return;
+    }
+    if (!newPassword) {
+      setPwdError('New password is required. Please fill in your new password.');
+      return;
+    }
+    if (newPassword.length < 4) {
+      setPwdError('New password must be at least 4 characters long.');
+      return;
+    }
+    if (oldPassword === newPassword) {
+      setPwdError('New password must be different from your current password.');
+      return;
+    }
+
     setChangingPwd(true);
     try {
       await api.changePassword(oldPassword, newPassword);
@@ -62,7 +85,7 @@ export default function App() {
       setNewPassword('');
       setTimeout(() => setShowPwdModal(false), 2000);
     } catch (err) {
-      setPwdError(err.message || 'Failed to update password');
+      setPwdError(err.message || 'Failed to update password. Please check your inputs.');
     } finally {
       setChangingPwd(false);
     }
@@ -76,7 +99,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <Navbar
         user={user}
-        onLogout={handleLogout}
+        onLogout={() => setShowLogoutConfirm(true)}
         onChangePasswordClick={() => {
           setPwdMsg('');
           setPwdError('');
@@ -247,6 +270,19 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Logout Confirmation Modal */}
+      <ModalDialog
+        isOpen={showLogoutConfirm}
+        type="danger"
+        title="Confirm Sign Out"
+        message="Are you sure you want to sign out of the Fee Management System station?"
+        confirmText="Sign Out"
+        cancelText="Stay Signed In"
+        confirmVariant="danger"
+        onConfirm={handleLogout}
+        onClose={() => setShowLogoutConfirm(false)}
+      />
     </div>
   );
 }

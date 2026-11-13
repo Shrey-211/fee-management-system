@@ -5,9 +5,14 @@ import {
   Mail, Users, Download, Plus, CheckCircle, RefreshCw, Save,
   Layers, Edit2, Trash2, X, AlertTriangle, ArrowRight, Check
 } from 'lucide-react';
+import ModalDialog from '../components/ModalDialog';
 
 export default function Settings({ user }) {
   const [activeTab, setActiveTab] = useState('fees'); // 'fees' | 'users' | 'backups' | 'smtp'
+
+  // Custom Popup Dialog States
+  const [deleteTypeDialog, setDeleteTypeDialog] = useState({ isOpen: false, typeId: null, typeName: '', loading: false });
+  const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '', type: 'info' });
 
   // Fee Heads
   const [feeHeads, setFeeHeads] = useState([]);
@@ -41,6 +46,7 @@ export default function Settings({ user }) {
   const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState('clerk');
   const [userMsg, setUserMsg] = useState('');
+  const [userError, setUserError] = useState('');
 
   // SMTP Settings
   const [smtpHost, setSmtpHost] = useState('');
@@ -52,6 +58,7 @@ export default function Settings({ user }) {
   const [smtpTls, setSmtpTls] = useState(true);
   const [testEmailTo, setTestEmailTo] = useState('');
   const [smtpMsg, setSmtpMsg] = useState('');
+  const [smtpError, setSmtpError] = useState('');
   const [testingSmtp, setTestingSmtp] = useState(false);
 
   const loadData = async () => {
@@ -145,27 +152,58 @@ export default function Settings({ user }) {
 
   const handleSaveTypeSubmit = async (e) => {
     e.preventDefault();
-    if (!typeFormName.trim() || !typeFormCode.trim()) {
-      setTypeError('Name and Code are required');
-      return;
-    }
-    setSavingType(true);
     setTypeError('');
 
-    try {
-      const rulesList = Object.entries(typeHeadRules).map(([headId, r]) => ({
-        fee_head_id: parseInt(headId),
-        waiver_percent: parseFloat(r.waiver_percent) || 0,
-        waiver_amount: parseFloat(r.waiver_amount) || 0,
-        reason: r.reason ? r.reason.trim() : null
-      }));
+    const trimmedName = (typeFormName || '').trim();
+    const trimmedCode = (typeFormCode || '').trim().toUpperCase();
 
+    if (!trimmedName && !trimmedCode) {
+      setTypeError('Please fill in all required fields (*): Fee Type Name and Code.');
+      return;
+    }
+    if (!trimmedName) {
+      setTypeError('Fee Type Name (*) is required. Please fill in this field.');
+      return;
+    }
+    if (!trimmedCode) {
+      setTypeError('Fee Type Code (*) is required. Please fill in this field.');
+      return;
+    }
+
+    let invalidRuleMsg = null;
+    const rulesList = [];
+    for (const [headId, r] of Object.entries(typeHeadRules)) {
+      const pct = parseFloat(r.waiver_percent) || 0;
+      const amt = parseFloat(r.waiver_amount) || 0;
+      if (pct < 0 || pct > 100) {
+        invalidRuleMsg = 'Waiver percentage must be between 0% and 100%.';
+        break;
+      }
+      if (amt < 0) {
+        invalidRuleMsg = 'Fixed waiver amount cannot be negative.';
+        break;
+      }
+      rulesList.push({
+        fee_head_id: parseInt(headId),
+        waiver_percent: pct,
+        waiver_amount: amt,
+        reason: (r.reason || '').trim() || null
+      });
+    }
+
+    if (invalidRuleMsg) {
+      setTypeError(invalidRuleMsg);
+      return;
+    }
+
+    setSavingType(true);
+    try {
       const payload = {
-        name: typeFormName.trim(),
-        code: typeFormCode.trim().toUpperCase(),
+        name: trimmedName,
+        code: trimmedCode,
         type_group: typeFormGroup,
         academic_year: '2026-2027',
-        description: typeFormDesc.trim(),
+        description: (typeFormDesc || '').trim() || null,
         is_active: true,
         rules: rulesList
       };
@@ -177,34 +215,47 @@ export default function Settings({ user }) {
       }
 
       setShowTypeModal(false);
-      // Reload types and auto-reapply fee rules to all students
       const updatedTypes = await api.getFeeTypes('2026-2027');
       setFeeTypes(updatedTypes);
       
-      // Auto re-evaluate enrolled students with new rules
       await api.reapplyFeeRules('2026-2027');
       setReapplyMsg(`Fee Type "${payload.name}" saved! All student ledgers have been re-evaluated with updated waiver rules.`);
       setTimeout(() => setReapplyMsg(''), 7000);
     } catch (err) {
-      setTypeError(err.message);
+      setTypeError(err.message || 'Failed to save Fee Type. Please check input values.');
     } finally {
       setSavingType(false);
     }
   };
 
-  const handleDeleteType = async (typeId, typeName) => {
-    if (!window.confirm(`Are you sure you want to delete the Fee Type "${typeName}"?`)) {
-      return;
-    }
+  const handleOpenDeleteTypeConfirm = (typeId, typeName) => {
+    setDeleteTypeDialog({
+      isOpen: true,
+      typeId,
+      typeName,
+      loading: false
+    });
+  };
+
+  const handleConfirmDeleteType = async () => {
+    if (!deleteTypeDialog.typeId) return;
+    setDeleteTypeDialog(prev => ({ ...prev, loading: true }));
     try {
-      await api.deleteFeeType(typeId);
+      await api.deleteFeeType(deleteTypeDialog.typeId);
       const updatedTypes = await api.getFeeTypes('2026-2027');
       setFeeTypes(updatedTypes);
       await api.reapplyFeeRules('2026-2027');
-      setReapplyMsg(`Fee Type deleted and student ledgers updated.`);
+      setDeleteTypeDialog({ isOpen: false, typeId: null, typeName: '', loading: false });
+      setReapplyMsg(`Fee Type "${deleteTypeDialog.typeName}" deleted and student ledgers updated.`);
       setTimeout(() => setReapplyMsg(''), 5000);
     } catch (err) {
-      alert(err.message);
+      setDeleteTypeDialog({ isOpen: false, typeId: null, typeName: '', loading: false });
+      setAlertModal({
+        isOpen: true,
+        type: 'danger',
+        title: 'Delete Failed',
+        message: err.message || 'Failed to delete fee type.'
+      });
     }
   };
 
@@ -216,7 +267,8 @@ export default function Settings({ user }) {
       setReapplyMsg(`Success: ${res.message}`);
       setTimeout(() => setReapplyMsg(''), 6000);
     } catch (err) {
-      alert(err.message);
+      setReapplyMsg(`Failed: ${err.message || 'Error recalculating fees'}`);
+      setTimeout(() => setReapplyMsg(''), 6000);
     } finally {
       setReapplyingRules(false);
     }
@@ -229,7 +281,12 @@ export default function Settings({ user }) {
   const handleUpdateFeeHead = async (head) => {
     const amt = parseFloat(headAmount);
     if (isNaN(amt) || amt < 0) {
-      alert('Please enter a valid amount');
+      setAlertModal({
+        isOpen: true,
+        type: 'warning',
+        title: 'Invalid Fee Amount',
+        message: 'Fee amount must be a valid number greater than or equal to ₹0.'
+      });
       return;
     }
     try {
@@ -237,7 +294,12 @@ export default function Settings({ user }) {
       setEditingHead(null);
       loadData();
     } catch (e) {
-      alert(e.message);
+      setAlertModal({
+        isOpen: true,
+        type: 'danger',
+        title: 'Update Failed',
+        message: e.message || 'Failed to update fee head.'
+      });
     }
   };
 
@@ -251,7 +313,8 @@ export default function Settings({ user }) {
       setBackups(bList);
       setTimeout(() => setBackupMsg(''), 5000);
     } catch (e) {
-      alert(e.message);
+      setBackupMsg(`Error: ${e.message || 'Failed to create backup snapshot'}`);
+      setTimeout(() => setBackupMsg(''), 6000);
     } finally {
       setCreatingBackup(false);
     }
@@ -260,11 +323,30 @@ export default function Settings({ user }) {
   const handleCreateUser = async (e) => {
     e.preventDefault();
     setUserMsg('');
+    setUserError('');
+
+    const u = (newUsername || '').trim();
+    const fn = (newFullName || '').trim();
+    const pw = newPassword || '';
+
+    if (!fn) {
+      setUserError('Full Staff Name (*) is required. Please fill in this field.');
+      return;
+    }
+    if (!u || u.length < 3) {
+      setUserError('Username (*) is required and must be at least 3 characters.');
+      return;
+    }
+    if (!pw || pw.length < 4) {
+      setUserError('Password (*) is required and must be at least 4 characters.');
+      return;
+    }
+
     try {
       await api.createUser({
-        username: newUsername.trim(),
-        password: newPassword,
-        full_name: newFullName.trim(),
+        username: u,
+        password: pw,
+        full_name: fn,
         role: newRole
       });
       setUserMsg('User account created successfully!');
@@ -275,51 +357,63 @@ export default function Settings({ user }) {
       setUserList(uList);
       setTimeout(() => setUserMsg(''), 4000);
     } catch (e) {
-      alert(e.message);
+      setUserError(e.message || 'Failed to create user account.');
     }
   };
 
   const handleSaveSmtp = async (e) => {
     e.preventDefault();
     setSmtpMsg('');
+    setSmtpError('');
+
+    const port = parseInt(smtpPort);
+    if (isNaN(port) || port < 1 || port > 65535) {
+      setSmtpError('Please enter a valid SMTP port number (e.g. 587 or 465).');
+      return;
+    }
+
     try {
       await api.updateSmtpSettings({
-        smtp_host: smtpHost.trim(),
-        smtp_port: parseInt(smtpPort),
-        smtp_username: smtpUser.trim(),
+        smtp_host: (smtpHost || '').trim(),
+        smtp_port: port,
+        smtp_username: (smtpUser || '').trim(),
         smtp_password: smtpPass,
-        smtp_from_email: smtpFrom.trim(),
-        smtp_from_name: smtpName.trim(),
+        smtp_from_email: (smtpFrom || '').trim(),
+        smtp_from_name: (smtpName || '').trim(),
         use_tls: smtpTls
       });
       setSmtpMsg('SMTP Settings saved successfully!');
       setTimeout(() => setSmtpMsg(''), 4000);
     } catch (e) {
-      alert(e.message);
+      setSmtpError(e.message || 'Failed to save SMTP settings.');
     }
   };
 
   const handleTestSmtp = async () => {
-    if (!testEmailTo) {
-      alert('Please enter a test recipient email');
+    setSmtpMsg('');
+    setSmtpError('');
+
+    const trimmedTest = (testEmailTo || '').trim();
+    if (!trimmedTest) {
+      setSmtpError('Please enter a recipient email address for testing.');
       return;
     }
+
     setTestingSmtp(true);
-    setSmtpMsg('');
     try {
       const res = await api.testSmtp({
-        test_email: testEmailTo.trim(),
-        smtp_host: smtpHost.trim(),
+        test_email: trimmedTest,
+        smtp_host: (smtpHost || '').trim(),
         smtp_port: parseInt(smtpPort),
-        smtp_username: smtpUser.trim(),
+        smtp_username: (smtpUser || '').trim(),
         smtp_password: smtpPass,
-        smtp_from_email: smtpFrom.trim(),
-        smtp_from_name: smtpName.trim(),
+        smtp_from_email: (smtpFrom || '').trim(),
+        smtp_from_name: (smtpName || '').trim(),
         use_tls: smtpTls
       });
       setSmtpMsg(res.message);
     } catch (e) {
-      alert('SMTP Test Failed: ' + e.message);
+      setSmtpError('SMTP Test Failed: ' + (e.message || 'Unknown network error'));
     } finally {
       setTestingSmtp(false);
     }
@@ -572,7 +666,7 @@ export default function Settings({ user }) {
                         {t.type_group === 'CUSTOM' && (
                           <button
                             type="button"
-                            onClick={() => handleDeleteType(t.id, t.name)}
+                            onClick={() => handleOpenDeleteTypeConfirm(t.id, t.name)}
                             title="Delete Fee Type"
                             className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition"
                           >
@@ -745,6 +839,11 @@ export default function Settings({ user }) {
                 {userMsg}
               </div>
             )}
+            {userError && (
+              <div className="p-2.5 mb-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-lg font-medium">
+                {userError}
+              </div>
+            )}
 
             <form onSubmit={handleCreateUser} className="space-y-3 text-xs">
               <div>
@@ -820,6 +919,11 @@ export default function Settings({ user }) {
           {smtpMsg && (
             <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg font-medium">
               {smtpMsg}
+            </div>
+          )}
+          {smtpError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg font-medium">
+              {smtpError}
             </div>
           )}
 
@@ -1122,6 +1226,31 @@ export default function Settings({ user }) {
           </div>
         </div>
       )}
+
+      {/* Delete Fee Type Confirmation Modal */}
+      <ModalDialog
+        isOpen={deleteTypeDialog.isOpen}
+        type="danger"
+        title="Delete Fee Concession Type"
+        message={`Are you sure you want to permanently delete the Fee Type "${deleteTypeDialog.typeName}"? All enrolled student ledgers will automatically re-evaluate under standard baseline rules.`}
+        confirmText="Yes, Delete Fee Type"
+        cancelText="Cancel"
+        confirmVariant="danger"
+        loading={deleteTypeDialog.loading}
+        onConfirm={handleConfirmDeleteType}
+        onClose={() => setDeleteTypeDialog({ isOpen: false, typeId: null, typeName: '', loading: false })}
+      />
+
+      {/* Action / Error Notification Modal */}
+      <ModalDialog
+        isOpen={alertModal.isOpen}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        confirmText="Close"
+        confirmVariant={alertModal.type === 'danger' ? 'danger' : (alertModal.type === 'warning' ? 'warning' : 'primary')}
+        onClose={() => setAlertModal({ isOpen: false, title: '', message: '', type: 'info' })}
+      />
     </div>
   );
 }

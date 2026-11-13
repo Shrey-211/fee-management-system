@@ -11,9 +11,24 @@ export default function Login({ onLoginSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    const trimmedUser = (username || '').trim();
+    if (!trimmedUser && !password) {
+      setError('Please enter both username and password.');
+      return;
+    }
+    if (!trimmedUser) {
+      setError('Username is required. Please enter your username.');
+      return;
+    }
+    if (!password) {
+      setError('Password is required. Please enter your password.');
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await api.login(username, password);
+      const res = await api.login(trimmedUser, password);
       localStorage.setItem('token', res.access_token);
       localStorage.setItem('user', JSON.stringify(res.user));
       onLoginSuccess(res.user);

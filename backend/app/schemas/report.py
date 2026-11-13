@@ -13,7 +13,7 @@ class ReportDateFilter(BaseModel):
 class DailyCollectionItem(BaseModel):
     payment_id: int
     receipt_no: str
-    physical_receipt_no: str
+    physical_receipt_no: Optional[str] = None
     student_name: str
     student_code: str
     category: str

@@ -179,7 +179,7 @@ export default function Dashboard({ setTab, onNewPaymentClick, onNewFineClick })
                 recentPayments.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50/80 transition">
                     <td className="px-4 py-3 text-slate-600">{p.payment_date}</td>
-                    <td className="px-4 py-3 font-mono font-bold text-slate-800">{p.physical_receipt_no}</td>
+                    <td className="px-4 py-3 font-mono font-bold text-slate-800">{p.physical_receipt_no || '—'}</td>
                     <td className="px-4 py-3 text-slate-400 font-mono">{p.internal_receipt_no}</td>
                     <td className="px-4 py-3 font-semibold text-slate-800">{p.student_name}</td>
                     <td className="px-4 py-3">

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { AlertCircle, Plus, Search, Filter, X, CheckCircle } from 'lucide-react';
 import StudentSelect from '../components/StudentSelect';
+import ModalDialog from '../components/ModalDialog';
 
 export default function Fines({ initialStudent, onClearInitialStudent, onSelectStudent, onPayFine }) {
   const [fines, setFines] = useState([]);
@@ -10,6 +11,10 @@ export default function Fines({ initialStudent, onClearInitialStudent, onSelectS
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
+
+  // Custom Popup Dialog States
+  const [waiveDialog, setWaiveDialog] = useState({ isOpen: false, fine: null, loading: false });
+  const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '', type: 'info' });
 
   // Form State
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -53,13 +58,26 @@ export default function Fines({ initialStudent, onClearInitialStudent, onSelectS
   const handleCreateFine = async (e) => {
     e.preventDefault();
     setFormError('');
+
     if (!selectedStudentId) {
-      setFormError('Please select a student');
+      setFormError('Please select a student (*).');
       return;
     }
+
+    const trimmedEvent = (eventName || '').trim();
+    if (!trimmedEvent) {
+      setFormError('Event / Reason (*) is required. Please fill in this field.');
+      return;
+    }
+
     const amt = parseFloat(amount);
     if (isNaN(amt) || amt <= 0) {
-      setFormError('Please enter a valid fine amount');
+      setFormError('Fine Amount (₹) (*) must be greater than 0.');
+      return;
+    }
+
+    if (!fineDate) {
+      setFormError('Date Levied (*) is required. Please select the date.');
       return;
     }
 
@@ -67,28 +85,44 @@ export default function Fines({ initialStudent, onClearInitialStudent, onSelectS
     try {
       await api.createFine({
         student_id: parseInt(selectedStudentId),
-        event_name: eventName.trim(),
+        event_name: trimmedEvent,
         amount: amt,
         fine_date: fineDate,
-        remarks: remarks.trim() || null
+        remarks: (remarks || '').trim() || null
       });
       setShowModal(false);
       setRemarks('');
       loadData();
     } catch (err) {
-      setFormError(err.message || 'Failed to apply fine');
+      setFormError(err.message || 'Failed to apply fine. Please check input fields.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleWaive = async (fineId) => {
-    if (!window.confirm('Are you sure you want to officially waive this fine?')) return;
+  const handleOpenWaiveConfirm = (fine) => {
+    setWaiveDialog({
+      isOpen: true,
+      fine,
+      loading: false
+    });
+  };
+
+  const handleConfirmWaive = async () => {
+    if (!waiveDialog.fine) return;
+    setWaiveDialog(prev => ({ ...prev, loading: true }));
     try {
-      await api.updateFine(fineId, { status: 'WAIVED', remarks: 'Waived by staff authority' });
+      await api.updateFine(waiveDialog.fine.id, { status: 'WAIVED', remarks: 'Waived by staff authority' });
+      setWaiveDialog({ isOpen: false, fine: null, loading: false });
       loadData();
     } catch (e) {
-      alert(e.message);
+      setWaiveDialog({ isOpen: false, fine: null, loading: false });
+      setAlertModal({
+        isOpen: true,
+        type: 'danger',
+        title: 'Action Failed',
+        message: e.message || 'Failed to waive fine.'
+      });
     }
   };
 
@@ -221,7 +255,7 @@ export default function Fines({ initialStudent, onClearInitialStudent, onSelectS
                     <td className="px-4 py-3 text-center space-x-2">
                       {f.status !== 'PAID' && f.status !== 'WAIVED' && (
                         <button
-                          onClick={() => handleWaive(f.id)}
+                          onClick={() => handleOpenWaiveConfirm(f)}
                           className="text-[11px] text-rose-600 hover:text-rose-800 font-medium underline"
                         >
                           Waive
@@ -346,6 +380,35 @@ export default function Fines({ initialStudent, onClearInitialStudent, onSelectS
           </div>
         </div>
       )}
+
+      {/* Waive Confirmation Modal */}
+      <ModalDialog
+        isOpen={waiveDialog.isOpen}
+        type="warning"
+        title="Confirm Fine Waiver"
+        message={
+          waiveDialog.fine
+            ? `Are you sure you want to officially waive the fine of ₹${Number(waiveDialog.fine.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })} for "${waiveDialog.fine.event_name}" (${waiveDialog.fine.student_name || 'Student'} - ${waiveDialog.fine.student_code})? The balance will be zeroed out on the student ledger.`
+            : 'Are you sure you want to officially waive this fine?'
+        }
+        confirmText="Yes, Waive Fine"
+        cancelText="Cancel"
+        confirmVariant="warning"
+        loading={waiveDialog.loading}
+        onConfirm={handleConfirmWaive}
+        onClose={() => setWaiveDialog({ isOpen: false, fine: null, loading: false })}
+      />
+
+      {/* Action / Error Notification Modal */}
+      <ModalDialog
+        isOpen={alertModal.isOpen}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        confirmText="Close"
+        confirmVariant={alertModal.type === 'danger' ? 'danger' : 'primary'}
+        onClose={() => setAlertModal({ isOpen: false, title: '', message: '', type: 'info' })}
+      />
     </div>
   );
 }

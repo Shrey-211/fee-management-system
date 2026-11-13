@@ -274,7 +274,7 @@ export default function Reports({ onSelectStudent }) {
                           <tr key={item.payment_id} className="hover:bg-slate-50/80">
                             <td className="px-4 py-3 text-slate-600">{item.payment_date}</td>
                             <td className="px-4 py-3 font-mono text-slate-400">{item.receipt_no}</td>
-                            <td className="px-4 py-3 font-mono font-black text-blue-900 bg-blue-50/20">{item.physical_receipt_no}</td>
+                            <td className="px-4 py-3 font-mono font-black text-blue-900 bg-blue-50/20">{item.physical_receipt_no || '—'}</td>
                             <td className="px-4 py-3 font-bold text-slate-900">{item.student_name}</td>
                             <td className="px-4 py-3 font-mono text-slate-500">{item.student_code}</td>
                             <td className="px-4 py-3">{item.category}</td>

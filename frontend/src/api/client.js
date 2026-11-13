@@ -1,5 +1,77 @@
 const API_BASE = '/api';
 
+function formatFieldName(rawName) {
+  if (!rawName) return '';
+  const fieldMap = {
+    dob: 'Date of Birth',
+    student_code: 'Student ID / Roll Code',
+    full_name: 'Full Name',
+    concession_type_id: 'Fee Concession Type',
+    mobile_number: 'Mobile Number',
+    email_address: 'Email Address',
+    course_branch: 'Course / Branch',
+    current_year: 'Current Year',
+    physical_receipt_no: 'Manual Receipt Book #',
+    payment_date: 'Receipt Date',
+    payment_mode: 'Payment Mode',
+    fine_date: 'Date Levied',
+    event_name: 'Event / Reason',
+    credit_date: 'Credit Date',
+    scholarship_name: 'Scholarship Scheme Name',
+    amount: 'Amount',
+    base_amount: 'Fee Amount',
+    old_password: 'Current Password',
+    new_password: 'New Password',
+  };
+  if (fieldMap[rawName]) return fieldMap[rawName];
+  return rawName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function parseErrorDetail(errData, statusText) {
+  if (!errData) return statusText || 'An unexpected error occurred';
+  
+  if (typeof errData.detail === 'string' && errData.detail.trim()) {
+    return errData.detail.trim();
+  }
+
+  if (Array.isArray(errData.detail) && errData.detail.length > 0) {
+    const errorLines = errData.detail.map(item => {
+      let field = '';
+      if (Array.isArray(item.loc) && item.loc.length > 0) {
+        field = item.loc[item.loc.length - 1];
+      }
+      const label = formatFieldName(field);
+      const msg = item.msg || '';
+      const type = item.type || '';
+
+      if (type.includes('missing') || msg.toLowerCase().includes('required')) {
+        return label ? `"${label}" is required. Please fill in all required fields.` : 'Please fill in all required fields.';
+      }
+      if (type.includes('date') || msg.toLowerCase().includes('date')) {
+        return label ? `"${label}" must be a valid date (or leave empty if optional).` : 'Invalid date format.';
+      }
+      if (msg.toLowerCase().includes('greater than 0') || type.includes('greater_than')) {
+        return label ? `"${label}" must be greater than 0.` : 'Amount must be greater than 0.';
+      }
+      return label ? `${label}: ${msg}` : msg;
+    });
+    return errorLines.join(' | ');
+  }
+
+  if (errData.detail && typeof errData.detail === 'object') {
+    if (errData.detail.message && typeof errData.detail.message === 'string') {
+      return errData.detail.message;
+    }
+    return JSON.stringify(errData.detail);
+  }
+
+  if (typeof errData.message === 'string' && errData.message.trim()) {
+    return errData.message.trim();
+  }
+
+  return typeof errData === 'string' ? errData : JSON.stringify(errData);
+}
+
 function getAuthHeaders() {
   const token = localStorage.getItem('token');
   const headers = { 'Content-Type': 'application/json' };
@@ -28,9 +100,9 @@ async function request(endpoint, options = {}) {
     let errorDetail = 'An error occurred';
     try {
       const errData = await response.json();
-      errorDetail = errData.detail || JSON.stringify(errData);
+      errorDetail = parseErrorDetail(errData, response.statusText);
     } catch (e) {
-      errorDetail = response.statusText;
+      errorDetail = response.statusText || 'Network request failed';
     }
     throw new Error(errorDetail);
   }

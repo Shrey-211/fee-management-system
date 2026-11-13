@@ -1,7 +1,7 @@
 from typing import Optional
 from decimal import Decimal
 from datetime import date, datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 class ScholarshipCreditCreate(BaseModel):
     student_id: int
@@ -11,6 +11,27 @@ class ScholarshipCreditCreate(BaseModel):
     credit_date: Optional[date] = None
     amount: Decimal = Field(..., gt=0)
     remarks: Optional[str] = None
+
+    @field_validator("fee_head_id", mode="before")
+    @classmethod
+    def coerce_fee_head_id(cls, v):
+        if v == "" or v is None or v == 0:
+            return None
+        return v
+
+    @field_validator("credit_date", mode="before")
+    @classmethod
+    def coerce_credit_date(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
+
+    @field_validator("sanction_order_no", "remarks", mode="before")
+    @classmethod
+    def coerce_empty_strings(cls, v):
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
 
 class ScholarshipCreditResponse(BaseModel):
     id: int

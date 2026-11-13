@@ -120,3 +120,81 @@ def test_full_workflow_student_payment_fines():
     assert out_excel_res.status_code == 200
     assert "spreadsheetml" in out_excel_res.headers["content-type"]
     assert len(out_excel_res.content) > 1000
+
+
+def test_form_validation_and_empty_string_coercion():
+    # Login as admin
+    login_res = client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
+    assert login_res.status_code == 200
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Student creation with empty string for optional dob and other optional fields
+    code = f"STU-EMPTY-{uuid.uuid4().hex[:6].upper()}"
+    empty_dob_payload = {
+        "student_code": code,
+        "full_name": "Empty DOB Student",
+        "dob": "",
+        "gender": "MALE",
+        "category": "OPEN",
+        "mobile_number": "",
+        "email_address": "",
+        "address": "",
+        "academic_year": "2026-2027",
+        "course_branch": "B.Tech Computer Science"
+    }
+    res = client.post("/api/students", json=empty_dob_payload, headers=headers)
+    assert res.status_code == 200
+    stu_data = res.json()
+    assert stu_data["dob"] is None
+    assert stu_data["mobile_number"] is None
+    assert stu_data["email_address"] is None
+    assert stu_data["address"] is None
+
+    # 2. Student creation with missing required fields: returns 422 with clean human-readable detail
+    missing_fields_payload = {
+        "gender": "MALE",
+        "category": "OPEN"
+    }
+    res422 = client.post("/api/students", json=missing_fields_payload, headers=headers)
+    assert res422.status_code == 422
+    err_json = res422.json()
+    assert isinstance(err_json["detail"], str)
+    assert "required" in err_json["detail"].lower()
+    assert "Student ID / Roll Code" in err_json["detail"] or "Full Student Name" in err_json["detail"]
+
+    # 3. Fine creation with empty fine_date and remarks
+    fine_res = client.post("/api/fines", json={
+        "student_id": stu_data["id"],
+        "event_name": "Freshers Gathering",
+        "amount": 250.00,
+        "fine_date": "",
+        "remarks": ""
+    }, headers=headers)
+    assert fine_res.status_code == 200
+    fine_data = fine_res.json()
+    assert fine_data["remarks"] is None
+
+    # 4. Fine creation with non-positive amount returns 422 with clean error
+    bad_fine = client.post("/api/fines", json={
+        "student_id": stu_data["id"],
+        "event_name": "Test Event",
+        "amount": -50.00
+    }, headers=headers)
+    assert bad_fine.status_code == 422
+    assert "greater than 0" in bad_fine.json()["detail"].lower()
+
+    # 5. Payment creation with physical_receipt_no omitted (optional)
+    detail_res = client.get(f"/api/students/{stu_data['id']}", headers=headers)
+    fee_head_id = detail_res.json()["fee_heads"][0]["fee_head_id"]
+
+    optional_receipt_payment = {
+        "student_id": stu_data["id"],
+        "payment_mode": "CASH",
+        "items": [{"fee_head_id": fee_head_id, "amount": 1000.00}]
+    }
+    pay_res = client.post("/api/payments", json=optional_receipt_payment, headers=headers)
+    assert pay_res.status_code == 200
+    pay_data = pay_res.json()
+    assert pay_data["internal_receipt_no"].startswith("RCP-")
+    assert Decimal(str(pay_data["total_amount"])) == Decimal("1000.00")
