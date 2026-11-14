@@ -36,6 +36,8 @@ def build():
         "--hidden-import=openpyxl",
         "--hidden-import=jwt",
         "--hidden-import=dotenv",
+        "--hidden-import=packaging",
+        "--hidden-import=packaging.version",
         "--hidden-import=sqlalchemy.dialects.sqlite",
         str(root / "entrypoint.py")
     ]

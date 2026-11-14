@@ -12,7 +12,8 @@ from .seed import seed_database
 from .services.backup_service import perform_sqlite_backup
 from .routers import (
     auth, students, fees, payments, fines, 
-    scholarships, reports, reminders, settings as settings_router
+    scholarships, reports, reminders, settings as settings_router,
+    updates
 )
 
 app = FastAPI(
@@ -94,6 +95,7 @@ app.include_router(scholarships.router)
 app.include_router(reports.router)
 app.include_router(reminders.router)
 app.include_router(settings_router.router)
+app.include_router(updates.router)
 
 @app.on_event("startup")
 def on_startup():

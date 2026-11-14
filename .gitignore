@@ -16,6 +16,8 @@ node_modules/
 # PyInstaller build artifacts
 build/
 *.spec
+releases/
+*.zip
 
 # Keep dist/FeeManagementSystem or ignore dist
 

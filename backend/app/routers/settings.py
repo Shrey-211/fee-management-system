@@ -112,7 +112,7 @@ def update_smtp_settings(
     settings.SMTP_USE_TLS = cfg.use_tls
 
     # Safely update .env without truncating other configuration keys
-    env_path = str(settings.DATA_DIR.parent / ".env")
+    env_path = str(settings.ENV_PATH)
     try:
         set_key(env_path, "SMTP_HOST", host)
         set_key(env_path, "SMTP_PORT", str(cfg.smtp_port))

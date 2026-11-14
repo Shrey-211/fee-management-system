@@ -295,6 +295,17 @@ export const api = {
   updateSmtpSettings: (data) => request('/settings/smtp', {
     method: 'POST',
     body: JSON.stringify(data)
+  }),
+
+  // System OTA Updates
+  checkUpdate: (force = false) => request(`/system/update/check?force=${force}`),
+  getUpdateProgress: () => request('/system/update/progress'),
+  downloadUpdate: (data) => request('/system/update/download', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  applyUpdate: () => request('/system/update/apply', {
+    method: 'POST'
   })
 };
 
