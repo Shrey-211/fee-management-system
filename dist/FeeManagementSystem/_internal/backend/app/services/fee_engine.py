@@ -181,6 +181,38 @@ def initialize_student_fees(student: Student, db: Session) -> List[StudentFeeHea
             db.add(sfh)
             result.append(sfh)
 
+        # Synchronize Government Scholarship entry for any fee head category waiver
+        existing_sc = db.query(ScholarshipCredit).filter(
+            ScholarshipCredit.student_id == student.id,
+            ScholarshipCredit.fee_head_id == fh.id
+        ).first()
+
+        if discount_amt > Decimal("0.00"):
+            scheme_name = reason or f"{student.category} Govt Scholarship Scheme"
+            if existing_sc:
+                # If not yet disbursed from government, keep amount and scheme synchronized
+                if existing_sc.status != "RECEIVED":
+                    existing_sc.amount = discount_amt
+                    existing_sc.scholarship_name = scheme_name
+                    existing_sc.remarks = "Not Received"
+            else:
+                new_sc = ScholarshipCredit(
+                    student_id=student.id,
+                    fee_head_id=fh.id,
+                    scholarship_name=scheme_name,
+                    amount=discount_amt,
+                    status="NOT_RECEIVED",
+                    credit_date=None,
+                    sanction_order_no=None,
+                    remarks="Not Received"
+                )
+                db.add(new_sc)
+        else:
+            # If no discount applies and there was an unreceived pending entry, clean it up
+            if existing_sc and existing_sc.status != "RECEIVED":
+                db.delete(existing_sc)
+
+
     db.flush()
     return result
 
@@ -202,15 +234,17 @@ def recalculate_student_balances(student_id: int, db: Session):
         ).all()
         total_paid_head = sum([quantize_amount(item.amount) for item in paid_from_payments], Decimal("0.00"))
 
-        # Also credit scholarships allocated to this fee head
+        # Also credit scholarships allocated to this fee head that have been marked as RECEIVED
         scholarship_credits = db.query(ScholarshipCredit).filter(
             ScholarshipCredit.student_id == student_id,
-            ScholarshipCredit.fee_head_id == sfh.fee_head_id
+            ScholarshipCredit.fee_head_id == sfh.fee_head_id,
+            ScholarshipCredit.status == "RECEIVED"
         ).all()
         total_scholarship = sum([quantize_amount(sc.amount) for sc in scholarship_credits], Decimal("0.00"))
 
-        sfh.paid_amount = quantize_amount(total_paid_head + total_scholarship)
+        sfh.paid_amount = quantize_amount(total_paid_head)
         sfh.balance = quantize_amount(sfh.net_due - sfh.paid_amount)
+
 
     # 2. Calculate fine balances
     fines = db.query(Fine).filter(Fine.student_id == student_id).all()

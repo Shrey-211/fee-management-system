@@ -7,10 +7,12 @@ from ..database import get_db
 from ..models.student import Student
 from ..models.user import User
 from ..schemas.student import StudentCreate, StudentUpdate, StudentResponse, StudentDetailResponse
-from ..auth import get_current_user
+from ..auth import get_current_user, require_accountant_or_admin
 from ..services.fee_engine import (
     initialize_student_fees, recalculate_student_balances, quantize_amount
 )
+from ..services.audit_service import log_audit
+
 
 router = APIRouter(prefix="/api/students", tags=["Students"])
 
@@ -28,6 +30,12 @@ def build_student_response(student: Student) -> dict:
 
     overall_balance = quantize_amount(fee_balance + total_fines_balance)
 
+    # Scholarship calculations
+    student_scholarships = getattr(student, 'scholarships', []) or []
+    scholarship_total = sum([quantize_amount(s.amount) for s in student_scholarships], Decimal("0.00"))
+    scholarship_received = sum([quantize_amount(s.amount) for s in student_scholarships if getattr(s, 'status', 'NOT_RECEIVED') == "RECEIVED"], Decimal("0.00"))
+    scholarship_pending = sum([quantize_amount(s.amount) for s in student_scholarships if getattr(s, 'status', 'NOT_RECEIVED') != "RECEIVED"], Decimal("0.00"))
+
     return {
         "id": student.id,
         "student_code": student.student_code,
@@ -39,7 +47,7 @@ def build_student_response(student: Student) -> dict:
         "email_address": student.email_address,
         "address": student.address,
         "academic_year": student.academic_year,
-        "course_branch": student.course_branch,
+        "course_branch": student.course_branch or "MBA",
         "current_year": student.current_year,
         "concession_type_id": student.concession_type_id,
         "concession_type_name": student.concession_type.name if student.concession_type else None,
@@ -52,7 +60,10 @@ def build_student_response(student: Student) -> dict:
         "total_fines": total_fines,
         "total_fines_paid": total_fines_paid,
         "total_fines_balance": total_fines_balance,
-        "overall_balance": overall_balance
+        "overall_balance": overall_balance,
+        "scholarship_total": scholarship_total,
+        "scholarship_received": scholarship_received,
+        "scholarship_pending": scholarship_pending
     }
 
 @router.get("", response_model=List[StudentResponse])
@@ -94,12 +105,28 @@ def create_student(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    existing = db.query(Student).filter(Student.student_code == student_in.student_code.strip()).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Student Code / Roll Number already exists")
+    academic_year = (student_in.academic_year or "25-26").strip()
+    clean_ay = academic_year.replace("/", "-")
+
+    # Handle roll number / student code: auto-generate if empty or whitespace
+    if not student_in.student_code or not student_in.student_code.strip():
+        # Generate format: MBA-{AY}-{0001}
+        count = db.query(Student).filter(Student.academic_year == academic_year).count() + 1
+        generated_code = f"MBA-{clean_ay}-{count:04d}"
+        while db.query(Student).filter(Student.student_code == generated_code).first():
+            count += 1
+            generated_code = f"MBA-{clean_ay}-{count:04d}"
+        student_code = generated_code
+    else:
+        student_code = student_in.student_code.strip().upper()
+        existing = db.query(Student).filter(Student.student_code == student_code).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Student Code / Roll Number already exists")
+
+    course_branch = (student_in.course_branch or "MBA").strip()
 
     student = Student(
-        student_code=student_in.student_code.strip().upper(),
+        student_code=student_code,
         full_name=student_in.full_name.strip(),
         dob=student_in.dob,
         gender=student_in.gender.strip().upper(),
@@ -108,9 +135,9 @@ def create_student(
         mobile_number=student_in.mobile_number.strip() if student_in.mobile_number else None,
         email_address=student_in.email_address.strip() if student_in.email_address else None,
         address=student_in.address,
-        academic_year=student_in.academic_year.strip(),
-        course_branch=student_in.course_branch,
-        current_year=student_in.current_year,
+        academic_year=academic_year,
+        course_branch=course_branch,
+        current_year=student_in.current_year or 1,
         is_active=True
     )
     db.add(student)
@@ -118,6 +145,22 @@ def create_student(
 
     # Automatically initialize fee heads and apply waiver rules
     initialize_student_fees(student, db)
+
+    log_audit(
+        db,
+        action="CREATE_STUDENT",
+        entity_name="students",
+        entity_id=student.id,
+        user_id=current_user.id if current_user else None,
+        details={
+            "student_code": student.student_code,
+            "full_name": student.full_name,
+            "category": student.category,
+            "gender": student.gender,
+            "academic_year": student.academic_year
+        }
+    )
+
     db.commit()
     db.refresh(student)
     return build_student_response(student)
@@ -208,12 +251,15 @@ def get_student_detail(
             "student_id": sc.student_id,
             "student_name": student.full_name,
             "student_code": student.student_code,
+            "student_category": student.category,
+            "academic_year": student.academic_year,
             "fee_head_id": sc.fee_head_id,
             "fee_head_name": sc.fee_head.name if sc.fee_head else None,
             "scholarship_name": sc.scholarship_name,
             "sanction_order_no": sc.sanction_order_no,
             "credit_date": sc.credit_date,
             "amount": sc.amount,
+            "status": getattr(sc, 'status', 'NOT_RECEIVED'),
             "remarks": sc.remarks,
             "created_at": sc.created_at
         }
@@ -240,6 +286,18 @@ def update_student(
         raise HTTPException(status_code=404, detail="Student not found")
 
     category_or_gender_changed = False
+
+    # Check permission if altering concession type, category, or gender which impact fees
+    changing_waiver_factors = (
+        (student_in.category is not None and student_in.category.strip().upper() != student.category) or
+        (student_in.gender is not None and student_in.gender.strip().upper() != student.gender) or
+        (student_in.concession_type_id is not None and student_in.concession_type_id != student.concession_type_id)
+    )
+    if changing_waiver_factors and current_user.role.lower() not in ["admin", "accountant"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Accountant or Admin privileges required to alter student category, gender, or concession quota"
+        )
 
     if student_in.student_code is not None:
         student.student_code = student_in.student_code.strip().upper()
@@ -274,6 +332,18 @@ def update_student(
     if category_or_gender_changed:
         # Re-apply waiver logic and update student fee heads
         initialize_student_fees(student, db)
+
+    log_audit(
+        db,
+        action="UPDATE_STUDENT",
+        entity_name="students",
+        entity_id=student.id,
+        user_id=current_user.id if current_user else None,
+        details={
+            "student_code": student.student_code,
+            "category_or_gender_changed": category_or_gender_changed
+        }
+    )
 
     db.commit()
     recalculate_student_balances(student.id, db)

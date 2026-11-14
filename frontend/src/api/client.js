@@ -212,6 +212,13 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(data)
   }),
+  markScholarshipReceived: (id, data = {}) => request(`/scholarships/${id}/mark-received`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
+  markScholarshipPending: (id) => request(`/scholarships/${id}/mark-pending`, {
+    method: 'PUT'
+  }),
 
   // Reports
   getDailyReport: (params = {}) => {
@@ -260,8 +267,21 @@ export const api = {
   // Settings & Backup
   getBackups: () => request('/settings/backups'),
   createBackup: () => request('/settings/backups/create', { method: 'POST' }),
-  downloadBackupUrl: (filename) => `${API_BASE}/settings/download-backup/${filename}`,
+  downloadBackup: async (filename) => {
+    const blob = await request(`/settings/backups/download/${filename}`);
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+  },
+  downloadBackupUrl: (filename) => `${API_BASE}/settings/backups/download/${filename}`,
+  getAuditLogs: (limit = 100) => request(`/settings/audit-logs?limit=${limit}`),
   getSmtpSettings: () => request('/settings/smtp'),
+
   updateSmtpSettings: (data) => request('/settings/smtp', {
     method: 'POST',
     body: JSON.stringify(data)

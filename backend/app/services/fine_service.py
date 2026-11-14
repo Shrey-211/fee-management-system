@@ -8,6 +8,7 @@ from ..models.student import Student
 from ..models.user import User
 from ..schemas.fine import FineCreate, FineUpdate
 from .fee_engine import quantize_amount, recalculate_student_balances
+from .audit_service import log_audit
 
 def apply_fine(
     db: Session,
@@ -34,6 +35,21 @@ def apply_fine(
         created_by_id=current_user.id if current_user else None
     )
     db.add(fine)
+    db.flush()
+
+    log_audit(
+        db,
+        action="APPLY_FINE",
+        entity_name="fines",
+        entity_id=fine.id,
+        user_id=current_user.id if current_user else None,
+        details={
+            "student_id": student.id,
+            "student_code": student.student_code,
+            "event_name": fine.event_name,
+            "amount": str(fine.amount)
+        }
+    )
     db.commit()
     db.refresh(fine)
 
@@ -63,8 +79,23 @@ def update_fine_status(
         if st == "WAIVED":
             fine.balance = Decimal("0.00")
 
+    log_audit(
+        db,
+        action="WAIVE_FINE" if (fine_in.status and fine_in.status.upper().strip() == "WAIVED") else "UPDATE_FINE",
+        entity_name="fines",
+        entity_id=fine.id,
+        user_id=current_user.id if current_user else None,
+        details={
+            "student_id": fine.student_id,
+            "status": fine.status,
+            "amount": str(fine.amount),
+            "balance": str(fine.balance)
+        }
+    )
+
     db.commit()
     recalculate_student_balances(fine.student_id, db)
     db.refresh(fine)
     return fine
+
 

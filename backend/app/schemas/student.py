@@ -8,7 +8,7 @@ from .payment import PaymentResponse
 from .scholarship import ScholarshipCreditResponse
 
 class StudentBase(BaseModel):
-    student_code: str = Field(..., description="Unique Student ID / Roll No")
+    student_code: Optional[str] = Field(default=None, description="Unique Student ID / Roll No (auto-generated if empty)")
     full_name: str
     dob: Optional[date] = None
     gender: str = Field(..., description="MALE, FEMALE, OTHER")
@@ -17,9 +17,16 @@ class StudentBase(BaseModel):
     mobile_number: Optional[str] = None
     email_address: Optional[str] = None
     address: Optional[str] = None
-    academic_year: str = "2026-2027"
-    course_branch: Optional[str] = "General"
+    academic_year: str = "25-26"
+    course_branch: Optional[str] = "MBA"
     current_year: int = 1
+
+    @field_validator("student_code", mode="before")
+    @classmethod
+    def coerce_student_code(cls, v):
+        if v == "" or v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        return v
 
     @field_validator("dob", mode="before")
     @classmethod
@@ -93,6 +100,9 @@ class StudentResponse(StudentBase):
     total_fines_paid: Decimal = Decimal("0.00")
     total_fines_balance: Decimal = Decimal("0.00")
     overall_balance: Decimal = Decimal("0.00")
+    scholarship_total: Decimal = Decimal("0.00")
+    scholarship_received: Decimal = Decimal("0.00")
+    scholarship_pending: Decimal = Decimal("0.00")
     created_at: Optional[datetime] = None
 
     class Config:

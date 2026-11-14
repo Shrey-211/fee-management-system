@@ -5,12 +5,14 @@ from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
+from .config import settings
 from .database import get_db
 from .models.user import User
 
-SECRET_KEY = "offline-college-fee-mgmt-secure-key-2026-local"
+SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours offline session
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 8  # 8 hours shift session
+
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 

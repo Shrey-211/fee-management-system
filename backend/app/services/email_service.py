@@ -1,4 +1,5 @@
 import smtplib
+from decimal import Decimal
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
@@ -8,6 +9,7 @@ from ..config import settings
 from ..models.student import Student
 from ..models.reminder import EmailTemplate, ReminderLog
 from .fee_engine import quantize_amount
+
 
 DEFAULT_TEMPLATE_SUBJECT = "Urgent: Pending Fee Dues Notice - {college_name}"
 DEFAULT_TEMPLATE_BODY = """Dear {student_name} (Roll No: {student_code}),
@@ -63,6 +65,11 @@ def interpolate_template(template_str: str, student: Student, due_date: str = "I
     return result
 
 
+def sanitize_email_header(val: Any) -> str:
+    if val is None:
+        return ""
+    return str(val).replace("\r", "").replace("\n", "").strip()
+
 def send_smtp_email(
     to_email: str,
     subject: str,
@@ -82,10 +89,15 @@ def send_smtp_email(
             "error": "SMTP server or credentials are not configured in Settings."
         }
 
+    clean_from_name = sanitize_email_header(from_name)
+    clean_from_email = sanitize_email_header(from_email)
+    clean_to_email = sanitize_email_header(to_email)
+    clean_subject = sanitize_email_header(subject)
+
     msg = MIMEMultipart()
-    msg['From'] = f"{from_name} <{from_email}>"
-    msg['To'] = to_email
-    msg['Subject'] = subject
+    msg['From'] = f"{clean_from_name} <{clean_from_email}>"
+    msg['To'] = clean_to_email
+    msg['Subject'] = clean_subject
     msg.attach(MIMEText(body_text, 'plain'))
 
     try:

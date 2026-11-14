@@ -15,8 +15,9 @@ class Student(Base):
     mobile_number = Column(String(20), nullable=True, index=True)
     email_address = Column(String(100), nullable=True)
     address = Column(String(255), nullable=True)
-    academic_year = Column(String(20), nullable=False, default="2026-2027")
-    course_branch = Column(String(100), nullable=True, default="General")
+    academic_year = Column(String(20), nullable=False, default="25-26")
+    course_branch = Column(String(100), nullable=True, default="MBA")
+
     current_year = Column(Integer, default=1)
     concession_type_id = Column(Integer, ForeignKey("fee_concession_types.id", ondelete="SET NULL"), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)

@@ -46,13 +46,14 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
     if (!student) return;
     setEditForm({
       full_name: student.full_name,
+      academic_year: student.academic_year || '25-26',
       gender: student.gender,
       category: student.category,
       concession_type_id: student.concession_type_id || '',
       mobile_number: student.mobile_number || '',
       email_address: student.email_address || '',
       address: student.address || '',
-      course_branch: student.course_branch || '',
+      course_branch: student.course_branch || 'MBA',
       current_year: student.current_year || 1
     });
     setEditError('');
@@ -72,11 +73,12 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
     const payload = {
       ...editForm,
       full_name: trimmedName,
+      academic_year: (editForm.academic_year || '25-26').trim(),
       concession_type_id: editForm.concession_type_id ? parseInt(editForm.concession_type_id) : null,
       mobile_number: (editForm.mobile_number || '').trim() || null,
       email_address: (editForm.email_address || '').trim() || null,
       address: (editForm.address || '').trim() || null,
-      course_branch: (editForm.course_branch || '').trim() || null
+      course_branch: (editForm.course_branch || 'MBA').trim()
     };
 
     setSavingEdit(true);
@@ -107,6 +109,29 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
       setEmailStatus('Error: ' + e.message);
     }
     setTimeout(() => setEmailStatus(''), 6000);
+  };
+
+  const handleMarkScholarshipReceived = async (scId) => {
+    const sanctionNo = window.prompt("Enter Sanction Order / DBT Reference # (optional):", "");
+    try {
+      await api.markScholarshipReceived(scId, {
+        sanction_order_no: sanctionNo ? sanctionNo.trim() : null,
+        credit_date: new Date().toISOString().split('T')[0]
+      });
+      loadStudent();
+    } catch (err) {
+      alert(err.message || "Failed to update scholarship status.");
+    }
+  };
+
+  const handleMarkScholarshipPending = async (scId) => {
+    if (!window.confirm("Reset this scholarship back to NOT RECEIVED?")) return;
+    try {
+      await api.markScholarshipPending(scId);
+      loadStudent();
+    } catch (err) {
+      alert(err.message || "Failed to update scholarship status.");
+    }
   };
 
   const handleOpenWaiveFine = (fine) => {
@@ -201,9 +226,6 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
           <div>
             <div className="flex items-center gap-3">
               <h2 className="text-xl font-black text-slate-900">{student.full_name}</h2>
-              <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-md bg-blue-50 text-blue-800 border border-blue-200">
-                {student.student_code}
-              </span>
               <span className="text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
                 {student.category}
               </span>
@@ -212,7 +234,7 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              {student.course_branch} — Year {student.current_year} | Academic Session: {student.academic_year}
+              Program: <strong>{student.course_branch || 'MBA'}</strong> | Academic Session: <strong>{student.academic_year || '25-26'}</strong>
             </p>
           </div>
 
@@ -223,6 +245,21 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
                 ₹{Number(student.net_fee_due).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </p>
             </div>
+            {Number(student.scholarship_total || 0) > 0 && (
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-600">Govt Scholarship</p>
+                <p className="text-lg font-black text-amber-700 font-mono">
+                  ₹{Number(student.scholarship_total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-[10px] font-semibold text-slate-500">
+                  {Number(student.scholarship_pending || 0) > 0 ? (
+                    <span className="text-amber-600">₹{Number(student.scholarship_pending).toLocaleString('en-IN')} Pending</span>
+                  ) : (
+                    <span className="text-emerald-600">Disbursed</span>
+                  )}
+                </p>
+              </div>
+            )}
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Paid</p>
               <p className="text-lg font-black text-emerald-600 font-mono">
@@ -318,6 +355,85 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
           </table>
         </div>
       </div>
+
+      {/* Government Scholarships & Category Subsidies Section */}
+      {student.scholarships && student.scholarships.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-slate-100 bg-amber-50/50 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Award className="w-4 h-4 text-amber-600" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                Government Scholarships & Category Subsidies
+              </h3>
+            </div>
+            <span className="text-[11px] text-amber-700 font-semibold">
+              Category fee waivers are claims on government grants
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50/50 text-slate-500 font-semibold border-b border-slate-200">
+                <tr>
+                  <th className="px-4 py-2.5">Fee Head</th>
+                  <th className="px-4 py-2.5">Scholarship Scheme</th>
+                  <th className="px-4 py-2.5 text-right">Claim Amount</th>
+                  <th className="px-4 py-2.5">Status</th>
+                  <th className="px-4 py-2.5">Sanction Order #</th>
+                  <th className="px-4 py-2.5">Credit Date</th>
+                  <th className="px-4 py-2.5 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {student.scholarships.map((sc) => {
+                  const isRec = sc.status === 'RECEIVED';
+                  return (
+                    <tr key={sc.id} className="hover:bg-slate-50/60">
+                      <td className="px-4 py-3 font-bold text-slate-800">
+                        {sc.fee_head_name || 'General Tuition/Dev'}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">{sc.scholarship_name}</td>
+                      <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">
+                        ₹{Number(sc.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-4 py-3">
+                        {isRec ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            <CheckCircle className="w-3 h-3 text-emerald-600" /> RECEIVED
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                            <Clock className="w-3 h-3 text-amber-600" /> NOT RECEIVED
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-slate-600">{sc.sanction_order_no || '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">{sc.credit_date || <span className="text-amber-600 italic">Pending Govt</span>}</td>
+                      <td className="px-4 py-3 text-center">
+                        {!isRec ? (
+                          <button
+                            onClick={() => handleMarkScholarshipReceived(sc.id)}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold transition shadow-sm"
+                          >
+                            Mark Received
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleMarkScholarshipPending(sc.id)}
+                            className="text-slate-400 hover:text-amber-600 text-[11px] transition"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Event Fines Section */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -492,13 +608,34 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="md:col-span-2">
+                <div>
                   <label className="block font-semibold text-slate-700 mb-1">Full Student Name *</label>
                   <input
                     type="text"
                     required
                     value={editForm.full_name}
                     onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Academic Year * (e.g. 25-26)</label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.academic_year || '25-26'}
+                    onChange={(e) => setEditForm({ ...editForm, academic_year: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Program / Course</label>
+                  <input
+                    type="text"
+                    value={editForm.course_branch || 'MBA'}
+                    onChange={(e) => setEditForm({ ...editForm, course_branch: e.target.value })}
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600"
                   />
                 </div>

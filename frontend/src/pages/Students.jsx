@@ -11,14 +11,15 @@ export default function Students({ onSelectStudent }) {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
   const [gender, setGender] = useState('');
+  const [academicYearFilter, setAcademicYearFilter] = useState('');
   const [hasDuesOnly, setHasDuesOnly] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [feeTypes, setFeeTypes] = useState([]);
 
-  // New Student Form State
+  // New Student Form State (Roll number removed, Academic Year added with default '25-26', Course default MBA)
   const [formData, setFormData] = useState({
-    student_code: '',
     full_name: '',
+    academic_year: '25-26',
     dob: '',
     gender: 'MALE',
     category: 'OPEN',
@@ -26,15 +27,14 @@ export default function Students({ onSelectStudent }) {
     mobile_number: '',
     email_address: '',
     address: '',
-    academic_year: '2026-2027',
-    course_branch: 'B.Tech Computer Science',
+    course_branch: 'MBA',
     current_year: 1
   });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
   useEffect(() => {
-    api.getFeeTypes('2026-2027')
+    api.getFeeTypes()
       .then(types => setFeeTypes(types || []))
       .catch(() => {});
   }, []);
@@ -46,6 +46,7 @@ export default function Students({ onSelectStudent }) {
       if (search) params.search = search;
       if (category) params.category = category;
       if (gender) params.gender = gender;
+      if (academicYearFilter) params.academic_year = academicYearFilter;
       if (hasDuesOnly) params.has_dues_only = true;
 
       const data = await api.getStudents(params);
@@ -62,38 +63,37 @@ export default function Students({ onSelectStudent }) {
       loadStudents();
     }, 250);
     return () => clearTimeout(timer);
-  }, [search, category, gender, hasDuesOnly]);
+  }, [search, category, gender, academicYearFilter, hasDuesOnly]);
 
   const handleCreateStudent = async (e) => {
     e.preventDefault();
     setFormError('');
 
-    const trimmedCode = (formData.student_code || '').trim();
     const trimmedName = (formData.full_name || '').trim();
+    const trimmedAY = (formData.academic_year || '25-26').trim();
 
-    if (!trimmedCode && !trimmedName) {
-      setFormError('Please fill in all required fields (*): Student ID / Roll Code and Full Student Name.');
-      return;
-    }
-    if (!trimmedCode) {
-      setFormError('Student ID / Roll Code (*) is required. Please fill in this field.');
-      return;
-    }
     if (!trimmedName) {
       setFormError('Full Student Name (*) is required. Please fill in this field.');
       return;
     }
+    if (!trimmedAY) {
+      setFormError('Academic Year (*) is required (e.g. 25-26).');
+      return;
+    }
 
     const payload = {
-      ...formData,
-      student_code: trimmedCode,
+      student_code: null,
       full_name: trimmedName,
+      academic_year: trimmedAY,
+      gender: formData.gender,
+      category: formData.category,
+      course_branch: (formData.course_branch || 'MBA').trim(),
+      current_year: formData.current_year || 1,
       dob: formData.dob && formData.dob.trim() ? formData.dob.trim() : null,
       concession_type_id: formData.concession_type_id ? parseInt(formData.concession_type_id) : null,
       mobile_number: (formData.mobile_number || '').trim() || null,
       email_address: (formData.email_address || '').trim() || null,
-      address: (formData.address || '').trim() || null,
-      course_branch: (formData.course_branch || '').trim() || 'General'
+      address: (formData.address || '').trim() || null
     };
 
     setSubmitting(true);
@@ -101,8 +101,8 @@ export default function Students({ onSelectStudent }) {
       const created = await api.createStudent(payload);
       setShowAddModal(false);
       setFormData({
-        student_code: '',
         full_name: '',
+        academic_year: '25-26',
         dob: '',
         gender: 'MALE',
         category: 'OPEN',
@@ -110,8 +110,7 @@ export default function Students({ onSelectStudent }) {
         mobile_number: '',
         email_address: '',
         address: '',
-        academic_year: '2026-2027',
-        course_branch: 'B.Tech Computer Science',
+        course_branch: 'MBA',
         current_year: 1
       });
       loadStudents();
@@ -133,13 +132,13 @@ export default function Students({ onSelectStudent }) {
     let devStatus = '100% Payable (₹15,000)';
 
     if (isSCST) {
-      tuitionStatus = '100% Waived (SC/ST Scheme: ₹0)';
-      devStatus = '100% Waived (SC/ST Scheme: ₹0)';
+      tuitionStatus = '100% Govt Scholarship (Govt: ₹40,000 - Not Received)';
+      devStatus = '100% Govt Scholarship (Govt: ₹15,000 - Not Received)';
     } else if (isGirl) {
-      tuitionStatus = '100% Waived (Girl Student Scheme: ₹0)';
+      tuitionStatus = '100% Govt Scheme (Govt: ₹40,000 - Not Received)';
       devStatus = '100% Payable (₹15,000)';
     } else if (isEBC) {
-      tuitionStatus = '50% Discount (EBC Scheme: ₹20,000)';
+      tuitionStatus = '50% Govt Scholarship (Govt: ₹20,000 - Not Received)';
       devStatus = '100% Payable (₹15,000)';
     }
 
@@ -148,21 +147,38 @@ export default function Students({ onSelectStudent }) {
 
   const preview = getWaiverPreview();
 
+  // Extract unique academic years from loaded students for easy filter selection
+  const availableAcademicYears = Array.from(new Set(students.map(s => s.academic_year).filter(Boolean)));
+  if (!availableAcademicYears.includes('25-26')) {
+    availableAcademicYears.unshift('25-26');
+  }
+
   return (
     <div className="space-y-4">
       {/* Search and Action Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex-1 w-full flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[220px]">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
             <input
               type="text"
-              placeholder="Search by student ID code, name, or phone..."
+              placeholder="Search by student name or phone..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
             />
           </div>
+
+          <select
+            value={academicYearFilter}
+            onChange={(e) => setAcademicYearFilter(e.target.value)}
+            className="py-2 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
+          >
+            <option value="">All Academic Years</option>
+            {availableAcademicYears.map(ay => (
+              <option key={ay} value={ay}>{ay}</option>
+            ))}
+          </select>
 
           <select
             value={category}
@@ -214,11 +230,11 @@ export default function Students({ onSelectStudent }) {
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
               <tr>
-                <th className="px-4 py-3">Student ID</th>
                 <th className="px-4 py-3">Full Name</th>
+                <th className="px-4 py-3">Academic Year</th>
                 <th className="px-4 py-3">Gender</th>
                 <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3">Branch & Year</th>
+                <th className="px-4 py-3">Govt Scholarship</th>
                 <th className="px-4 py-3 text-right">Applicable Fee</th>
                 <th className="px-4 py-3 text-right">Paid Amount</th>
                 <th className="px-4 py-3 text-right">Fines Due</th>
@@ -246,16 +262,37 @@ export default function Students({ onSelectStudent }) {
                     onClick={() => onSelectStudent(s.id)}
                     className="hover:bg-blue-50/50 cursor-pointer transition"
                   >
-                    <td className="px-4 py-3 font-mono font-bold text-blue-700">{s.student_code}</td>
-                    <td className="px-4 py-3 font-bold text-slate-900">{s.full_name}</td>
+                    <td className="px-4 py-3">
+                      <div className="font-bold text-slate-900">{s.full_name}</div>
+                      <div className="text-[11px] text-slate-400 font-normal">MBA Program</div>
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-slate-700">
+                      <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                        {s.academic_year || '25-26'}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-slate-600">{s.gender}</td>
                     <td className="px-4 py-3">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
                         {s.category}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {s.course_branch} (Yr {s.current_year})
+                    <td className="px-4 py-3">
+                      {Number(s.scholarship_total || 0) > 0 ? (
+                        Number(s.scholarship_pending || 0) > 0 ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200" title="Government scholarship claim pending disbursement">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                            ₹{Number(s.scholarship_pending).toLocaleString('en-IN')} (Not Received)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200" title="Scholarship received from Government">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            ₹{Number(s.scholarship_received).toLocaleString('en-IN')} (Received)
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right font-mono text-slate-700">
                       ₹{Number(s.net_fee_due).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -297,7 +334,7 @@ export default function Students({ onSelectStudent }) {
             <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-bold">Enroll New Student Profile</h3>
-                <p className="text-xs text-slate-400">Applicable fee heads & category waivers will auto-calculate</p>
+                <p className="text-xs text-slate-400">Default Program: MBA | Academic Year & Scholarships auto-tracked</p>
               </div>
               <button
                 onClick={() => setShowAddModal(false)}
@@ -316,18 +353,6 @@ export default function Students({ onSelectStudent }) {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Student ID / Roll Code *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. STU-2026-007"
-                    value={formData.student_code}
-                    onChange={(e) => setFormData({ ...formData, student_code: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
-                  />
-                </div>
-
-                <div>
                   <label className="block font-semibold text-slate-700 mb-1">Full Student Name *</label>
                   <input
                     type="text"
@@ -336,6 +361,18 @@ export default function Students({ onSelectStudent }) {
                     value={formData.full_name}
                     onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Academic Year * (e.g. 25-26)</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 25-26"
+                    value={formData.academic_year}
+                    onChange={(e) => setFormData({ ...formData, academic_year: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none font-medium"
                   />
                 </div>
 
@@ -435,10 +472,10 @@ export default function Students({ onSelectStudent }) {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Branch / Course</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Program / Course</label>
                   <input
                     type="text"
-                    placeholder="e.g. B.Tech Computer Science"
+                    placeholder="MBA"
                     value={formData.course_branch}
                     onChange={(e) => setFormData({ ...formData, course_branch: e.target.value })}
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
@@ -460,14 +497,14 @@ export default function Students({ onSelectStudent }) {
               {/* Automatic Fee Waiver Live Preview */}
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl space-y-1">
                 <p className="font-bold text-blue-900 flex items-center gap-1">
-                  <span>⚡ Automatic Fee Waiver Assessment:</span>
+                  <span>⚡ Automatic Fee Waiver & Govt Scholarship Assessment:</span>
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-slate-700">
                   <div>Tuition: <span className="font-semibold text-blue-800">{preview.tuitionStatus}</span></div>
                   <div>Development: <span className="font-semibold text-blue-800">{preview.devStatus}</span></div>
                 </div>
                 <p className="text-[10px] text-blue-600 mt-1 italic">
-                  Compulsory fees (Dress Code ₹3,000, Exam ₹2,000, Other ₹1,000) apply equally to all students.
+                  Note: All category discounts will be tracked under the Scholarships section with status "Not Received" until funds are disbursed by the government.
                 </p>
               </div>
 

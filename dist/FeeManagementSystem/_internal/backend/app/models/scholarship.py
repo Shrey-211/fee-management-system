@@ -11,9 +11,11 @@ class ScholarshipCredit(Base):
     fee_head_id = Column(Integer, ForeignKey("fee_heads.id", ondelete="SET NULL"), nullable=True)
     scholarship_name = Column(String(100), nullable=False)  # MahaDBT, Post-Matric, Freeship, etc.
     sanction_order_no = Column(String(100), nullable=True)
-    credit_date = Column(SqlDate, default=date.today, nullable=False)
+    credit_date = Column(SqlDate, nullable=True)
     amount = Column(Numeric(10, 2), nullable=False, default=0.0)
+    status = Column(String(20), default="NOT_RECEIVED", nullable=False)  # NOT_RECEIVED, RECEIVED
     remarks = Column(String(255), nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
     student = relationship("Student", back_populates="scholarships")

@@ -58,6 +58,13 @@ def update_fine(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    if fine_in.status and fine_in.status.upper().strip() == "WAIVED":
+        if current_user.role.lower() not in ["admin", "accountant"]:
+            raise HTTPException(
+                status_code=403,
+                detail="Accountant or Admin privileges required to waive event fines"
+            )
     fine = update_fine_status(db, fine_id, fine_in, current_user=current_user)
     return serialize_fine(fine)
+
 

@@ -35,6 +35,7 @@ def build():
         "--hidden-import=bcrypt",
         "--hidden-import=openpyxl",
         "--hidden-import=jwt",
+        "--hidden-import=dotenv",
         "--hidden-import=sqlalchemy.dialects.sqlite",
         str(root / "entrypoint.py")
     ]

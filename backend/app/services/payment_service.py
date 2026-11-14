@@ -1,3 +1,4 @@
+import threading
 from datetime import date, datetime
 from decimal import Decimal
 from typing import List, Optional
@@ -11,22 +12,27 @@ from ..models.fine import Fine
 from ..models.user import User
 from ..schemas.payment import PaymentCreate
 from .fee_engine import quantize_amount, recalculate_student_balances
+from .audit_service import log_audit
+
+receipt_generation_lock = threading.Lock()
 
 def generate_internal_receipt_no(db: Session, academic_year: str = "2026") -> str:
-    current_year_prefix = academic_year.split("-")[0] if "-" in academic_year else academic_year
-    prefix = f"RCP-{current_year_prefix}-"
-    last_payment = db.query(Payment).filter(Payment.internal_receipt_no.like(f"{prefix}%")).order_by(Payment.id.desc()).first()
-    
-    if last_payment and last_payment.internal_receipt_no:
-        try:
-            last_seq = int(last_payment.internal_receipt_no.replace(prefix, ""))
-            next_seq = last_seq + 1
-        except ValueError:
-            next_seq = 1
-    else:
-        next_seq = 1
+    with receipt_generation_lock:
+        current_year_prefix = academic_year.split("-")[0] if "-" in academic_year else academic_year
+        prefix = f"RCP-{current_year_prefix}-"
+        last_payment = db.query(Payment).filter(Payment.internal_receipt_no.like(f"{prefix}%")).order_by(Payment.id.desc()).first()
         
-    return f"{prefix}{next_seq:05d}"
+        if last_payment and last_payment.internal_receipt_no:
+            try:
+                last_seq = int(last_payment.internal_receipt_no.replace(prefix, ""))
+                next_seq = last_seq + 1
+            except ValueError:
+                next_seq = 1
+        else:
+            next_seq = 1
+            
+        return f"{prefix}{next_seq:05d}"
+
 
 
 def record_payment(
@@ -51,8 +57,19 @@ def record_payment(
     ent_date = payment_in.entry_date or date.today()
     mode = payment_in.payment_mode.upper().strip()
 
-    internal_receipt = generate_internal_receipt_no(db, student.academic_year)
     phys_receipt = (payment_in.physical_receipt_no or "").strip()
+    if phys_receipt:
+        existing_phys = db.query(Payment).filter(
+            Payment.physical_receipt_no == phys_receipt,
+            Payment.student_id == student.id
+        ).first()
+        if existing_phys:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Manual receipt book number '{phys_receipt}' has already been recorded for this student."
+            )
+
+    internal_receipt = generate_internal_receipt_no(db, student.academic_year)
 
     payment = Payment(
         internal_receipt_no=internal_receipt,
@@ -97,6 +114,24 @@ def record_payment(
         db.add(p_item)
 
     db.flush()
+
+    # Log audit trail
+    log_audit(
+        db,
+        action="RECORD_PAYMENT",
+        entity_name="payments",
+        entity_id=payment.id,
+        user_id=current_user.id if current_user else None,
+        details={
+            "student_id": student.id,
+            "student_code": student.student_code,
+            "internal_receipt_no": internal_receipt,
+            "physical_receipt_no": phys_receipt,
+            "total_amount": str(total_amount),
+            "payment_mode": mode
+        }
+    )
+
     # Recalculate student dues
     recalculate_student_balances(student.id, db)
     db.commit()

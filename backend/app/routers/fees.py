@@ -11,6 +11,8 @@ from ..schemas.fee import (
 )
 from ..auth import get_current_user, require_admin
 from ..services.fee_engine import quantize_amount, reapply_all_student_fee_rules
+from ..services.audit_service import log_audit
+
 
 router = APIRouter(prefix="/api/fees", tags=["Fees"])
 
@@ -49,6 +51,15 @@ def create_fee_head(
         allows_waiver=head_in.allows_waiver
     )
     db.add(head)
+    db.flush()
+    log_audit(
+        db,
+        action="CREATE_FEE_HEAD",
+        entity_name="fee_heads",
+        entity_id=head.id,
+        user_id=admin.id,
+        details={"name": head.name, "code": head.code, "base_amount": str(head.base_amount)}
+    )
     db.commit()
     db.refresh(head)
     return head
@@ -76,9 +87,18 @@ def update_fee_head(
     if head_in.allows_waiver is not None:
         head.allows_waiver = head_in.allows_waiver
 
+    log_audit(
+        db,
+        action="UPDATE_FEE_HEAD",
+        entity_name="fee_heads",
+        entity_id=head.id,
+        user_id=admin.id,
+        details={"name": head.name, "code": head.code, "base_amount": str(head.base_amount)}
+    )
     db.commit()
     db.refresh(head)
     return head
+
 
 
 def build_concession_type_response(t: FeeConcessionType) -> dict:
@@ -154,9 +174,18 @@ def create_concession_type(
         )
         db.add(rule)
 
+    log_audit(
+        db,
+        action="CREATE_CONCESSION_TYPE",
+        entity_name="fee_concession_types",
+        entity_id=c_type.id,
+        user_id=admin.id,
+        details={"name": c_type.name, "code": c_type.code, "group": c_type.type_group}
+    )
     db.commit()
     db.refresh(c_type)
     return build_concession_type_response(c_type)
+
 
 
 @router.get("/types/{type_id}", response_model=FeeConcessionTypeResponse)
@@ -207,9 +236,18 @@ def update_concession_type(
             )
             db.add(rule)
 
+    log_audit(
+        db,
+        action="CREATE_CONCESSION_TYPE",
+        entity_name="fee_concession_types",
+        entity_id=c_type.id,
+        user_id=admin.id,
+        details={"name": c_type.name, "code": c_type.code, "group": c_type.type_group}
+    )
     db.commit()
     db.refresh(c_type)
     return build_concession_type_response(c_type)
+
 
 
 @router.delete("/types/{type_id}")
@@ -221,7 +259,17 @@ def delete_concession_type(
     c_type = db.query(FeeConcessionType).filter(FeeConcessionType.id == type_id).first()
     if not c_type:
         raise HTTPException(status_code=404, detail="Fee concession type not found")
+    name = c_type.name
+    code = c_type.code
     db.delete(c_type)
+    log_audit(
+        db,
+        action="DELETE_CONCESSION_TYPE",
+        entity_name="fee_concession_types",
+        entity_id=type_id,
+        user_id=admin.id,
+        details={"name": name, "code": code}
+    )
     db.commit()
     return {"status": "deleted", "id": type_id}
 
@@ -233,9 +281,18 @@ def reapply_fee_rules(
     db: Session = Depends(get_db)
 ):
     count = reapply_all_student_fee_rules(db, academic_year=academic_year)
+    log_audit(
+        db,
+        action="REAPPLY_FEE_RULES",
+        entity_name="fee_rules",
+        user_id=admin.id,
+        details={"academic_year": academic_year, "students_recalculated": count}
+    )
+    db.commit()
     return {
         "status": "success",
         "academic_year": academic_year,
         "students_recalculated": count,
         "message": f"Successfully re-evaluated and updated fee rules for {count} students."
     }
+

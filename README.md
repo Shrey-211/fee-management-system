@@ -108,3 +108,14 @@ Administrators can configure or add custom fee types in **Settings**:
 - **Automatic Daily Backups**: Timestamped snapshots saved to `backend/backups/`.
 - **One-Click USB Backup**: Click **"Backup Database Now"** in Settings to generate a fresh snapshot and download the `.db` file for safekeeping on an external USB pen drive.
 
+---
+
+## 9. Security Hardening & Audit Controls
+
+- **Cryptographic Security**: Automatic local generation of a high-entropy 256-bit cryptographic `SECRET_KEY` stored in `.env`.
+- **Strict Role-Based Access Control (RBAC)**: Clerks are strictly restricted to student directory lookups, balance queries, and physical receipt payment entry. Only Administrators and Accountants can create/modify fee concessions, waive event fines, or credit scholarships.
+- **Tamper-Evident Audit Trail**: Every sensitive financial transaction (payments, manual receipt logging, fine waivers, scholarship credits, student quota changes, and database backup downloads) is automatically recorded in the `audit_logs` table with timestamp, user ID, and full transaction parameters. Administrators can review the live audit trail under **Settings > Security Audit Trail**.
+- **Receipt Concurrency & Integrity Protection**: Thread-safe synchronized receipt sequence numbering and duplicate prevention on manual paper receipt numbers.
+- **Network Defense**: Restrictive CORS configuration, directory traversal path sanitization on backups, and injection-hardened email headers.
+
+

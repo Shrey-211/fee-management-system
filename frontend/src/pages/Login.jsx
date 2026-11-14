@@ -3,8 +3,8 @@ import { api } from '../api/client';
 import { ShieldCheck, Lock, User, WifiOff, ArrowRight } from 'lucide-react';
 
 export default function Login({ onLoginSuccess }) {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -37,11 +37,6 @@ export default function Login({ onLoginSuccess }) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleQuickFill = (u, p) => {
-    setUsername(u);
-    setPassword(p);
   };
 
   return (
@@ -114,35 +109,6 @@ export default function Login({ onLoginSuccess }) {
               )}
             </button>
           </form>
-
-          <div className="mt-6 pt-4 border-t border-slate-100">
-            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider text-center mb-2">
-              Quick Sign-In (Preconfigured Staff Roles)
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickFill('admin', 'admin123')}
-                className="px-2 py-1.5 bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 text-[11px] font-medium rounded border border-slate-200 transition text-center"
-              >
-                Admin
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickFill('accountant', 'account123')}
-                className="px-2 py-1.5 bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 text-[11px] font-medium rounded border border-slate-200 transition text-center"
-              >
-                Accountant
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickFill('clerk', 'clerk123')}
-                className="px-2 py-1.5 bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 text-[11px] font-medium rounded border border-slate-200 transition text-center"
-              >
-                Clerk
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>

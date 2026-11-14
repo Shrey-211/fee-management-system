@@ -106,9 +106,52 @@ def seed_database():
             if cols and "concession_type_id" not in cols:
                 print("Adding concession_type_id column to students table...")
                 cursor.execute("ALTER TABLE students ADD COLUMN concession_type_id INTEGER REFERENCES fee_concession_types(id)")
+                raw_conn.commit()
                 db.commit()
+
+            cursor.execute("PRAGMA table_info(scholarship_credits)")
+            sc_info = {row[1]: row[3] for row in cursor.fetchall()}
+            if sc_info and "status" not in sc_info:
+                print("Adding status column to scholarship_credits table...")
+                cursor.execute("ALTER TABLE scholarship_credits ADD COLUMN status VARCHAR(20) DEFAULT 'NOT_RECEIVED'")
+                raw_conn.commit()
+                db.commit()
+
+            # If credit_date has NOT NULL constraint (1), recreate table to make it nullable
+            if sc_info.get("credit_date") == 1:
+                print("Migrating scholarship_credits to make credit_date nullable...")
+                cursor.execute("PRAGMA foreign_keys=off")
+                cursor.execute("""
+                    CREATE TABLE scholarship_credits_new (
+                        id INTEGER PRIMARY KEY,
+                        student_id INTEGER NOT NULL,
+                        fee_head_id INTEGER,
+                        scholarship_name VARCHAR(100) NOT NULL,
+                        sanction_order_no VARCHAR(100),
+                        credit_date DATE,
+                        amount NUMERIC(10, 2) NOT NULL,
+                        status VARCHAR(20) DEFAULT 'NOT_RECEIVED',
+                        remarks VARCHAR(255),
+                        created_at DATETIME,
+                        FOREIGN KEY(student_id) REFERENCES students (id) ON DELETE CASCADE,
+                        FOREIGN KEY(fee_head_id) REFERENCES fee_heads (id) ON DELETE SET NULL
+                    )
+                """)
+                cursor.execute("""
+                    INSERT INTO scholarship_credits_new (id, student_id, fee_head_id, scholarship_name, sanction_order_no, credit_date, amount, status, remarks, created_at)
+                    SELECT id, student_id, fee_head_id, scholarship_name, sanction_order_no, credit_date, amount, COALESCE(status, 'NOT_RECEIVED'), remarks, created_at FROM scholarship_credits
+                """)
+                cursor.execute("DROP TABLE scholarship_credits")
+                cursor.execute("ALTER TABLE scholarship_credits_new RENAME TO scholarship_credits")
+                cursor.execute("CREATE INDEX IF NOT EXISTS ix_scholarship_credits_student_id ON scholarship_credits (student_id)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS ix_scholarship_credits_id ON scholarship_credits (id)")
+                cursor.execute("PRAGMA foreign_keys=on")
+                raw_conn.commit()
+                db.commit()
+                print("Migration of scholarship_credits completed.")
         except Exception as e:
             print("Column migration notice:", e)
+
 
         # 3. Seed Fee Concession Types & Head Rules
         if db.query(FeeConcessionType).count() == 0:
@@ -271,8 +314,8 @@ def seed_database():
                     mobile_number="9876543210",
                     email_address="aarav.sharma@example.com",
                     address="102 Saraswati Nagar, Pune",
-                    academic_year="2026-2027",
-                    course_branch="B.Tech Computer Science",
+                    academic_year="25-26",
+                    course_branch="MBA",
                     current_year=1
                 ),
                 Student(
@@ -284,8 +327,8 @@ def seed_database():
                     mobile_number="9876543211",
                     email_address="pooja.kulkarni@example.com",
                     address="45 Shivaji Chowk, Kolhapur",
-                    academic_year="2026-2027",
-                    course_branch="B.Tech Computer Science",
+                    academic_year="25-26",
+                    course_branch="MBA",
                     current_year=1
                 ),
                 Student(
@@ -297,8 +340,8 @@ def seed_database():
                     mobile_number="9876543212",
                     email_address="rohan.patil@example.com",
                     address="Lane 3, Deccan Gymkhana, Pune",
-                    academic_year="2026-2027",
-                    course_branch="B.Tech Mechanical",
+                    academic_year="25-26",
+                    course_branch="MBA",
                     current_year=2
                 ),
                 Student(
@@ -310,8 +353,8 @@ def seed_database():
                     mobile_number="9876543213",
                     email_address="vikas.kamble@example.com",
                     address="Ambedkar Nagar, Solapur",
-                    academic_year="2026-2027",
-                    course_branch="B.Tech Civil",
+                    academic_year="25-26",
+                    course_branch="MBA",
                     current_year=1
                 ),
                 Student(
@@ -323,8 +366,8 @@ def seed_database():
                     mobile_number="9876543214",
                     email_address="anjali.gaikwad@example.com",
                     address="Tribal Hostel, Nashik",
-                    academic_year="2026-2027",
-                    course_branch="B.Tech Electronics",
+                    academic_year="25-26",
+                    course_branch="MBA",
                     current_year=1
                 ),
                 Student(
@@ -336,11 +379,12 @@ def seed_database():
                     mobile_number="9876543215",
                     email_address="snehal.deshmukh@example.com",
                     address="CIDCO, Aurangabad",
-                    academic_year="2026-2027",
-                    course_branch="B.Tech IT",
+                    academic_year="25-26",
+                    course_branch="MBA",
                     current_year=1
                 )
             ]
+
 
             db.add_all(sample_students)
             db.commit()

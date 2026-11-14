@@ -11,6 +11,8 @@ from ..auth import (
     verify_password, get_password_hash, create_access_token, 
     get_current_user, require_admin
 )
+from ..services.audit_service import log_audit
+
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
@@ -29,11 +31,21 @@ def login(login_req: LoginRequest, db: Session = Depends(get_db)):
         )
 
     token = create_access_token(data={"sub": user.username, "role": user.role})
+    log_audit(
+        db,
+        action="USER_LOGIN",
+        entity_name="users",
+        entity_id=user.id,
+        user_id=user.id,
+        details={"username": user.username, "role": user.role}
+    )
+    db.commit()
     return {
         "access_token": token,
         "token_type": "bearer",
         "user": user
     }
+
 
 @router.get("/me", response_model=UserResponse)
 def get_current_user_profile(current_user: User = Depends(get_current_user)):
@@ -49,8 +61,17 @@ def change_password(
         raise HTTPException(status_code=400, detail="Current password is incorrect")
     
     current_user.password_hash = get_password_hash(pwd_req.new_password)
+    log_audit(
+        db,
+        action="CHANGE_PASSWORD",
+        entity_name="users",
+        entity_id=current_user.id,
+        user_id=current_user.id,
+        details={"username": current_user.username}
+    )
     db.commit()
     return {"message": "Password updated successfully"}
+
 
 @router.get("/users", response_model=List[UserResponse])
 def list_users(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
@@ -74,6 +95,15 @@ def create_user(
         is_active=True
     )
     db.add(new_user)
+    db.flush()
+    log_audit(
+        db,
+        action="CREATE_USER",
+        entity_name="users",
+        entity_id=new_user.id,
+        user_id=admin.id,
+        details={"username": new_user.username, "role": new_user.role}
+    )
     db.commit()
     db.refresh(new_user)
     return new_user
@@ -96,6 +126,14 @@ def update_user(
     if user_in.is_active is not None:
         user.is_active = user_in.is_active
 
+    log_audit(
+        db,
+        action="UPDATE_USER",
+        entity_name="users",
+        entity_id=user.id,
+        user_id=admin.id,
+        details={"username": user.username, "role": user.role, "is_active": user.is_active}
+    )
     db.commit()
     db.refresh(user)
     return user

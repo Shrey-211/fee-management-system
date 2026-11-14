@@ -8,7 +8,7 @@ from ..schemas.reminder import (
     EmailTemplateCreate, EmailTemplateUpdate, EmailTemplateResponse,
     SendReminderRequest, TestEmailRequest
 )
-from ..auth import get_current_user, require_accountant_or_admin
+from ..auth import get_current_user, require_accountant_or_admin, require_admin
 from ..services.email_service import dispatch_reminder_to_student, send_smtp_email
 
 router = APIRouter(prefix="/api/reminders", tags=["Reminders"])
@@ -128,16 +128,17 @@ def get_reminder_logs(
 @router.post("/test")
 def test_smtp_configuration(
     test_req: TestEmailRequest,
-    current_user: User = Depends(require_accountant_or_admin)
+    admin: User = Depends(require_admin)
 ):
     smtp_override = {
-        "host": test_req.smtp_host,
+        "host": test_req.smtp_host.strip(),
         "port": test_req.smtp_port,
-        "username": test_req.smtp_username,
+        "username": test_req.smtp_username.strip(),
         "password": test_req.smtp_password,
-        "from_email": test_req.smtp_from_email,
-        "from_name": test_req.smtp_from_name
+        "from_email": test_req.smtp_from_email.strip(),
+        "from_name": test_req.smtp_from_name.strip()
     }
+
     res = send_smtp_email(
         to_email=test_req.test_email,
         subject="Test Notification — Student Fee Management System",
