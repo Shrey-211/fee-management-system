@@ -122,6 +122,11 @@ async function request(endpoint, options = {}) {
 
 export const api = {
   // Auth
+  getSetupStatus: () => request('/auth/setup-status'),
+  setupAdmin: (data) => request('/auth/setup-admin', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
   login: (username, password) => request('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ username, password })

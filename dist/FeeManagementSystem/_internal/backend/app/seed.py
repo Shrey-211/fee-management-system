@@ -18,35 +18,35 @@ def seed_database(seed_samples: bool = False):
     db: Session = SessionLocal()
 
     try:
-        # 1. Seed Users (Admin, Accountant, Clerk)
-        if db.query(User).count() == 0:
-            print("Seeding default users...")
-            users = [
-                User(
-                    username="admin",
-                    password_hash=get_password_hash("admin123"),
-                    full_name="Mr. Shrikant (Fee Administrator)",
-                    role="admin",
-                    is_active=True
-                ),
-                User(
-                    username="accountant",
-                    password_hash=get_password_hash("account123"),
-                    full_name="College Accountant",
-                    role="accountant",
-                    is_active=True
-                ),
-                User(
-                    username="clerk",
-                    password_hash=get_password_hash("clerk123"),
-                    full_name="Fee Collection Clerk",
-                    role="clerk",
-                    is_active=True
-                )
-            ]
-            db.add_all(users)
-            db.commit()
-            print("Default users seeded: admin/admin123, accountant/account123, clerk/clerk123")
+        # 1. Initialize Master Administrator if configured by installer setup
+        admin_init_file = settings.DATA_DIR / "initial_admin.json"
+        if admin_init_file.exists() and db.query(User).count() == 0:
+            try:
+                import json
+                with open(admin_init_file, "r", encoding="utf-8") as f:
+                    admin_data = json.load(f)
+                u_name = admin_data.get("username", "").strip()
+                p_word = admin_data.get("password", "").strip()
+                f_name = admin_data.get("full_name", "College Administrator").strip()
+                if u_name and p_word:
+                    admin_user = User(
+                        username=u_name,
+                        password_hash=get_password_hash(p_word),
+                        full_name=f_name,
+                        role="admin",
+                        is_active=True
+                    )
+                    db.add(admin_user)
+                    db.commit()
+                    print(f"Master administrator account '{u_name}' initialized successfully.")
+            except Exception as e:
+                print(f"Error initializing master administrator: {e}")
+            finally:
+                # Always remove initial_admin.json immediately so plaintext credentials never persist on disk
+                try:
+                    admin_init_file.unlink(missing_ok=True)
+                except Exception:
+                    pass
 
         # 2. Seed Fee Heads
         if db.query(FeeHead).count() == 0:

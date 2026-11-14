@@ -102,7 +102,6 @@ def main():
                 return
 
     print("Status: Starting offline local server at http://127.0.0.1:8000...")
-    print("Default Admin Login: admin / admin123")
     print("Press Ctrl+C in this console to safely shut down the application.")
     print("=" * 65)
 

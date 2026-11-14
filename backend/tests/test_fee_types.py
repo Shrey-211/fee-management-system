@@ -86,7 +86,15 @@ def test_dynamic_fee_concession_types_and_waiver_rules():
     assert reapply_res.json()["students_recalculated"] >= 1
 
     # 7. Clean up test student and test custom fee type to keep database pristine
-    client.delete(f"/api/students/{created_student['id']}", headers=headers)
+    from backend.app.database import SessionLocal
+    from backend.app.models.student import Student
+    from backend.app.models.fee import StudentFeeHead
+    clean_session = SessionLocal()
+    clean_session.query(StudentFeeHead).filter(StudentFeeHead.student_id == created_student["id"]).delete()
+    clean_session.query(Student).filter(Student.id == created_student["id"]).delete()
+    clean_session.commit()
+    clean_session.close()
+
     del_type_res = client.delete(f"/api/fees/types/{sports_type_id}", headers=headers)
     assert del_type_res.status_code == 200
 

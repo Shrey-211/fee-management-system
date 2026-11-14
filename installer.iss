@@ -49,3 +49,115 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilen
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+var
+  AdminPage: TInputQueryWizardPage;
+  IsUpgradeInstall: Boolean;
+
+procedure InitializeWizard;
+begin
+  IsUpgradeInstall := False;
+
+  // Create Custom Master Administrator Setup Page
+  AdminPage := CreateInputQueryPage(
+    wpSelectDir,
+    'Master Administrator Account Setup',
+    'Create the initial Administrator login credentials for Fee Management.',
+    'For maximum counter security, default passwords are not used. Please create your master credentials:');
+
+  AdminPage.Add('Staff Full Name (e.g. Mr. Shrikant):', False);
+  AdminPage.Add('Administrator Username (min 3 chars, no spaces):', False);
+  AdminPage.Add('Master Password (min 6 chars):', True);
+  AdminPage.Add('Confirm Password:', True);
+
+  AdminPage.Values[0] := 'Mr. Shrikant (Fee Admin)';
+  AdminPage.Values[1] := 'admin';
+end;
+
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := False;
+  // If upgrading existing system where database already exists in target folder, skip credential creation
+  if PageID = AdminPage.ID then
+  begin
+    if FileExists(WizardDirValue + '\data\fees.db') then
+    begin
+      IsUpgradeInstall := True;
+      Result := True;
+    end
+    else
+    begin
+      IsUpgradeInstall := False;
+      Result := False;
+    end;
+  end;
+end;
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+var
+  uName: String;
+  pWord: String;
+  cWord: String;
+begin
+  Result := True;
+  if CurPageID = AdminPage.ID then
+  begin
+    uName := Trim(AdminPage.Values[1]);
+    pWord := AdminPage.Values[2];
+    cWord := AdminPage.Values[3];
+
+    if Trim(AdminPage.Values[0]) = '' then
+    begin
+      MsgBox('Please enter the Administrator Full Name.', mbError, MB_OK);
+      Result := False;
+      Exit;
+    end;
+
+    if (Length(uName) < 3) or (Pos(' ', uName) > 0) then
+    begin
+      MsgBox('Username must be at least 3 characters long and cannot contain spaces.', mbError, MB_OK);
+      Result := False;
+      Exit;
+    end;
+
+    if Length(pWord) < 6 then
+    begin
+      MsgBox('Password must be at least 6 characters long.', mbError, MB_OK);
+      Result := False;
+      Exit;
+    end;
+
+    if pWord <> cWord then
+    begin
+      MsgBox('Passwords do not match. Please re-enter your password.', mbError, MB_OK);
+      Result := False;
+      Exit;
+    end;
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  JsonContent: String;
+  DataDir: String;
+  JsonFile: String;
+begin
+  if CurStep = ssPostInstall then
+  begin
+    DataDir := ExpandConstant('{app}\data');
+    JsonFile := DataDir + '\initial_admin.json';
+    
+    // Write admin config if this is a fresh setup
+    if not IsUpgradeInstall then
+    begin
+      JsonContent := '{' +
+        '"full_name": "' + AdminPage.Values[0] + '",' +
+        '"username": "' + Trim(AdminPage.Values[1]) + '",' +
+        '"password": "' + AdminPage.Values[2] + '"' +
+        '}';
+      ForceDirectories(DataDir);
+      SaveStringToFile(JsonFile, JsonContent, False);
+    end;
+  end;
+end;

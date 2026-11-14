@@ -16,6 +16,52 @@ from ..services.audit_service import log_audit
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
+@router.get("/setup-status")
+def get_setup_status(db: Session = Depends(get_db)):
+    """Check if the system has been initialized with at least one administrator account."""
+    user_count = db.query(User).count()
+    return {"is_configured": user_count > 0}
+
+@router.post("/setup-admin", response_model=TokenResponse)
+def setup_first_time_admin(admin_data: UserCreate, db: Session = Depends(get_db)):
+    """
+    First-time administrator setup endpoint.
+    Only allows creation of an initial Master Admin if NO users exist in the database.
+    """
+    if db.query(User).count() > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="System is already configured with an administrator account. Please sign in."
+        )
+    
+    admin_user = User(
+        username=admin_data.username.strip(),
+        password_hash=get_password_hash(admin_data.password),
+        full_name=admin_data.full_name.strip(),
+        role="admin",
+        is_active=True
+    )
+    db.add(admin_user)
+    db.commit()
+    db.refresh(admin_user)
+
+    token = create_access_token(data={"sub": admin_user.username, "role": admin_user.role})
+    log_audit(
+        db,
+        action="FIRST_TIME_ADMIN_SETUP",
+        entity_name="users",
+        entity_id=admin_user.id,
+        user_id=admin_user.id,
+        details={"username": admin_user.username, "role": admin_user.role}
+    )
+    db.commit()
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": admin_user
+    }
+
 @router.post("/login", response_model=TokenResponse)
 def login(login_req: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == login_req.username.strip()).first()

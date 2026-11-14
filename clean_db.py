@@ -12,7 +12,7 @@ def clean_database(db_path: Path):
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
 
-    # Tables to completely clear (all transactional and student data)
+    # Tables to completely clear (all transactional, student, and default credentials)
     tables_to_clear = [
         "scholarship_disbursements",
         "scholarship_credits",
@@ -23,7 +23,8 @@ def clean_database(db_path: Path):
         "students",
         "audit_logs",
         "email_logs",
-        "reminder_logs"
+        "reminder_logs",
+        "users"
     ]
 
     cur.execute("PRAGMA foreign_keys = OFF;")
