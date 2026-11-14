@@ -85,3 +85,8 @@ def test_dynamic_fee_concession_types_and_waiver_rules():
     assert reapply_res.json()["status"] == "success"
     assert reapply_res.json()["students_recalculated"] >= 1
 
+    # 7. Clean up test student and test custom fee type to keep database pristine
+    client.delete(f"/api/students/{created_student['id']}", headers=headers)
+    del_type_res = client.delete(f"/api/fees/types/{sports_type_id}", headers=headers)
+    assert del_type_res.status_code == 200
+

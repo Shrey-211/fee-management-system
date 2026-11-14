@@ -20,8 +20,8 @@ def perform_sqlite_backup() -> str:
     dest_path = settings.BACKUP_DIR / backup_filename
 
     # Perform online snapshot
-    src_conn = sqlite3.connect(str(db_file))
-    dest_conn = sqlite3.connect(str(dest_path))
+    src_conn = sqlite3.connect(str(db_file), timeout=30)
+    dest_conn = sqlite3.connect(str(dest_path), timeout=30)
     with dest_conn:
         src_conn.backup(dest_conn)
     dest_conn.close()

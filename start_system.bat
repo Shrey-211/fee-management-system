@@ -5,7 +5,11 @@ echo ===================================================================
 echo           STUDENT FEE MANAGEMENT SYSTEM — OFFLINE EDITION
 echo                    Mr. Shrikant's Office Station
 echo ===================================================================
-echo Starting local service...
-python entrypoint.py
-pause
-
+if exist "dist\FeeManagementSystem\FeeManagementSystem.exe" (
+    echo Starting compiled standalone application...
+    start "" "dist\FeeManagementSystem\FeeManagementSystem.exe"
+) else (
+    echo Starting local service via Python...
+    python entrypoint.py
+    pause
+)

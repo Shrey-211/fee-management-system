@@ -4,8 +4,54 @@ from pathlib import Path
 from dotenv import load_dotenv, set_key
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+import os
+import sys
+import shutil
+import secrets
+from pathlib import Path
+from dotenv import load_dotenv, set_key
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 BASE_DIR = Path(__file__).resolve().parent.parent
-ENV_PATH = BASE_DIR / ".env"
+
+# Determine application roots:
+# When packaged as a frozen PyInstaller executable, store user database and backups
+# in a 'data' and 'backups' directory next to the executable, so user data persists cleanly.
+if getattr(sys, 'frozen', False):
+    APP_DIR = Path(sys.executable).resolve().parent
+    DATA_DIR = APP_DIR / "data"
+    BACKUP_DIR = APP_DIR / "backups"
+    ENV_PATH = APP_DIR / ".env"
+else:
+    APP_DIR = BASE_DIR
+    DATA_DIR = BASE_DIR / "data"
+    BACKUP_DIR = BASE_DIR / "backups"
+    ENV_PATH = BASE_DIR / ".env"
+
+# Ensure directories exist
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+
+# If frozen executable and active database doesn't exist yet, copy initial database if bundled
+db_file = DATA_DIR / "fees.db"
+if not db_file.exists():
+    # Check if bundled in PyInstaller _MEIPASS
+    bundled_db = getattr(sys, '_MEIPASS', None)
+    if bundled_db:
+        candidate = Path(bundled_db) / "backend" / "data" / "fees.db"
+        if candidate.exists():
+            try:
+                shutil.copy2(candidate, db_file)
+            except Exception:
+                pass
+    # Or check if source database exists in project tree
+    if not db_file.exists():
+        src_candidate = BASE_DIR / "data" / "fees.db"
+        if src_candidate.exists():
+            try:
+                shutil.copy2(src_candidate, db_file)
+            except Exception:
+                pass
 
 # Ensure .env exists with a secure cryptographic SECRET_KEY
 if not ENV_PATH.exists():
@@ -47,9 +93,9 @@ class Settings(BaseSettings):
     ]
 
     # Database
-    DATA_DIR: Path = BASE_DIR / "data"
-    BACKUP_DIR: Path = BASE_DIR / "backups"
-    DATABASE_URL: str = f"sqlite:///{BASE_DIR / 'data' / 'fees.db'}"
+    DATA_DIR: Path = DATA_DIR
+    BACKUP_DIR: Path = BACKUP_DIR
+    DATABASE_URL: str = f"sqlite:///{DATA_DIR / 'fees.db'}"
 
     # Default Academic Year
     DEFAULT_ACADEMIC_YEAR: str = "2026-2027"
@@ -64,8 +110,4 @@ class Settings(BaseSettings):
     SMTP_USE_TLS: bool = True
 
 settings = Settings()
-
-# Ensure directories exist
-settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
-settings.BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
