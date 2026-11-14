@@ -5,9 +5,9 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models.payment import Payment
 from ..models.user import User
-from ..schemas.payment import PaymentCreate, PaymentResponse
-from ..auth import get_current_user
-from ..services.payment_service import record_payment
+from ..schemas.payment import PaymentCreate, PaymentUpdate, PaymentResponse
+from ..auth import get_current_user, require_accountant_or_admin
+from ..services.payment_service import record_payment, update_payment, delete_payment
 
 router = APIRouter(prefix="/api/payments", tags=["Payments"])
 
@@ -80,3 +80,21 @@ def get_payment(
     if not p:
         raise HTTPException(status_code=404, detail="Payment receipt not found")
     return serialize_payment(p)
+
+@router.put("/{payment_id}", response_model=PaymentResponse)
+def edit_payment(
+    payment_id: int,
+    payment_in: PaymentUpdate,
+    current_user: User = Depends(require_accountant_or_admin),
+    db: Session = Depends(get_db)
+):
+    payment = update_payment(db, payment_id, payment_in, current_user=current_user)
+    return serialize_payment(payment)
+
+@router.delete("/{payment_id}")
+def remove_payment(
+    payment_id: int,
+    current_user: User = Depends(require_accountant_or_admin),
+    db: Session = Depends(get_db)
+):
+    return delete_payment(db, payment_id, current_user=current_user)

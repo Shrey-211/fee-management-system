@@ -5,14 +5,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from ..database import get_db
-from ..models.scholarship import ScholarshipCredit
+from ..models.scholarship import ScholarshipCredit, ScholarshipDisbursement
 from ..models.student import Student
 from ..models.fee import FeeHead
 from ..models.user import User
 from ..schemas.scholarship import (
     ScholarshipCreditCreate,
     ScholarshipCreditResponse,
-    MarkScholarshipReceivedRequest
+    MarkScholarshipReceivedRequest,
+    ScholarshipDisbursementResponse
 )
 from ..auth import get_current_user, require_accountant_or_admin
 from ..services.fee_engine import quantize_amount, recalculate_student_balances
@@ -22,6 +23,29 @@ from ..services.audit_service import log_audit
 router = APIRouter(prefix="/api/scholarships", tags=["Scholarships"])
 
 def serialize_scholarship(sc: ScholarshipCredit) -> dict:
+    amt = quantize_amount(sc.amount)
+    rec = quantize_amount(getattr(sc, 'received_amount', None) or (amt if getattr(sc, 'status', None) == 'RECEIVED' else Decimal("0.00")))
+    rem = quantize_amount(max(Decimal("0.00"), amt - rec))
+
+    if rec <= Decimal("0.00"):
+        st = "NOT_RECEIVED"
+    elif rec >= amt:
+        st = "RECEIVED"
+    else:
+        st = "PARTIALLY_RECEIVED"
+
+    disb_list = []
+    for d in (getattr(sc, 'disbursements', []) or []):
+        disb_list.append({
+            "id": d.id,
+            "scholarship_id": d.scholarship_id,
+            "amount": quantize_amount(d.amount),
+            "disbursement_date": d.disbursement_date,
+            "sanction_order_no": d.sanction_order_no,
+            "remarks": d.remarks,
+            "created_at": d.created_at
+        })
+
     return {
         "id": sc.id,
         "student_id": sc.student_id,
@@ -34,16 +58,19 @@ def serialize_scholarship(sc: ScholarshipCredit) -> dict:
         "scholarship_name": sc.scholarship_name,
         "sanction_order_no": sc.sanction_order_no,
         "credit_date": sc.credit_date,
-        "amount": sc.amount,
-        "status": getattr(sc, 'status', 'NOT_RECEIVED'),
-        "remarks": sc.remarks or ("Not Received" if getattr(sc, 'status', 'NOT_RECEIVED') != "RECEIVED" else None),
-        "created_at": sc.created_at
+        "amount": amt,
+        "received_amount": rec,
+        "remaining_amount": rem,
+        "status": st,
+        "remarks": sc.remarks or ("Not Received" if st == "NOT_RECEIVED" else (f"Partially Received (₹{rec})" if st == "PARTIALLY_RECEIVED" else "Received")),
+        "created_at": sc.created_at,
+        "disbursements": disb_list
     }
 
 @router.get("", response_model=List[ScholarshipCreditResponse])
 def get_scholarships(
     student_id: Optional[int] = None,
-    status: Optional[str] = Query(None, description="RECEIVED or NOT_RECEIVED"),
+    status: Optional[str] = Query(None, description="RECEIVED, PARTIALLY_RECEIVED, or NOT_RECEIVED"),
     search: Optional[str] = Query(None, description="Search by student name or scholarship"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -51,8 +78,6 @@ def get_scholarships(
     query = db.query(ScholarshipCredit).join(Student, ScholarshipCredit.student_id == Student.id)
     if student_id:
         query = query.filter(ScholarshipCredit.student_id == student_id)
-    if status:
-        query = query.filter(ScholarshipCredit.status == status.upper().strip())
     if search:
         s = f"%{search.strip()}%"
         query = query.filter(or_(
@@ -62,11 +87,21 @@ def get_scholarships(
             ScholarshipCredit.sanction_order_no.ilike(s)
         ))
     
-    # Sort NOT_RECEIVED first, then by id desc
     credits = query.order_by(ScholarshipCredit.id.desc()).all()
-    # Sort so NOT_RECEIVED are easily prominent if viewing all
-    credits.sort(key=lambda x: 0 if getattr(x, 'status', 'NOT_RECEIVED') == 'NOT_RECEIVED' else 1)
-    return [serialize_scholarship(sc) for sc in credits]
+    serialized = [serialize_scholarship(sc) for sc in credits]
+
+    if status:
+        stat_filter = status.upper().strip()
+        if stat_filter in ["PARTIAL", "PARTIALLY_RECEIVED"]:
+            serialized = [s for s in serialized if s["status"] == "PARTIALLY_RECEIVED"]
+        elif stat_filter == "RECEIVED":
+            serialized = [s for s in serialized if s["status"] == "RECEIVED"]
+        elif stat_filter in ["NOT_RECEIVED", "PENDING"]:
+            serialized = [s for s in serialized if s["status"] == "NOT_RECEIVED"]
+
+    # Sort: Pending/partial first, then fully received
+    serialized.sort(key=lambda x: 0 if x["status"] == "NOT_RECEIVED" else (1 if x["status"] == "PARTIALLY_RECEIVED" else 2))
+    return serialized
 
 @router.post("", response_model=ScholarshipCreditResponse)
 def create_scholarship(
@@ -82,7 +117,6 @@ def create_scholarship(
     if amount <= Decimal("0.00"):
         raise HTTPException(status_code=400, detail="Scholarship credit amount must be greater than zero")
 
-    # If fee_head_id provided, verify
     if sc_in.fee_head_id:
         fh = db.query(FeeHead).filter(FeeHead.id == sc_in.fee_head_id).first()
         if not fh:
@@ -90,8 +124,22 @@ def create_scholarship(
 
     status = (sc_in.status or "NOT_RECEIVED").upper().strip()
     credit_date = sc_in.credit_date
-    if status == "RECEIVED" and not credit_date:
-        credit_date = date.today()
+    received_amount = quantize_amount(sc_in.received_amount or Decimal("0.00"))
+
+    if status == "RECEIVED" and received_amount <= Decimal("0.00"):
+        received_amount = amount
+
+    if received_amount >= amount:
+        status = "RECEIVED"
+        if not credit_date:
+            credit_date = date.today()
+    elif received_amount > Decimal("0.00"):
+        status = "PARTIALLY_RECEIVED"
+        if not credit_date:
+            credit_date = date.today()
+    else:
+        status = "NOT_RECEIVED"
+        received_amount = Decimal("0.00")
 
     sc = ScholarshipCredit(
         student_id=student.id,
@@ -100,11 +148,23 @@ def create_scholarship(
         sanction_order_no=sc_in.sanction_order_no,
         credit_date=credit_date,
         amount=amount,
+        received_amount=received_amount,
         status=status,
-        remarks=sc_in.remarks or ("Not Received" if status != "RECEIVED" else None)
+        remarks=sc_in.remarks or ("Not Received" if status == "NOT_RECEIVED" else ("Partial" if status == "PARTIALLY_RECEIVED" else "Received"))
     )
     db.add(sc)
     db.flush()
+
+    if received_amount > Decimal("0.00"):
+        disb = ScholarshipDisbursement(
+            scholarship_id=sc.id,
+            amount=received_amount,
+            disbursement_date=credit_date or date.today(),
+            sanction_order_no=sc_in.sanction_order_no,
+            remarks=sc_in.remarks or "Initial Disbursement"
+        )
+        db.add(disb)
+        db.flush()
 
     log_audit(
         db,
@@ -117,6 +177,7 @@ def create_scholarship(
             "student_code": student.student_code,
             "scholarship_name": sc.scholarship_name,
             "amount": str(sc.amount),
+            "received_amount": str(sc.received_amount),
             "status": sc.status
         }
     )
@@ -136,24 +197,61 @@ def mark_scholarship_received(
     if not sc:
         raise HTTPException(status_code=404, detail="Scholarship record not found")
 
-    sc.status = "RECEIVED"
-    sc.credit_date = req.credit_date or date.today()
-    if req.sanction_order_no:
-        sc.sanction_order_no = req.sanction_order_no.strip()
-    if req.remarks:
-        sc.remarks = req.remarks.strip()
+    claim_amount = quantize_amount(sc.amount)
+    current_received = quantize_amount(getattr(sc, 'received_amount', None) or (claim_amount if sc.status == "RECEIVED" else Decimal("0.00")))
+    remaining_due = quantize_amount(max(Decimal("0.00"), claim_amount - current_received))
+
+    if remaining_due <= Decimal("0.00"):
+        raise HTTPException(status_code=400, detail="This scholarship claim has already been 100% received.")
+
+    if req.amount is not None:
+        inst_amount = quantize_amount(req.amount)
+        if inst_amount <= Decimal("0.00"):
+            raise HTTPException(status_code=400, detail="Disbursement amount must be greater than zero.")
+        if inst_amount > remaining_due:
+            raise HTTPException(status_code=400, detail=f"Amount entered (₹{inst_amount}) exceeds remaining due (₹{remaining_due}).")
     else:
-        sc.remarks = f"Disbursed by Government on {sc.credit_date}"
+        inst_amount = remaining_due
+
+    disb_date = req.credit_date or date.today()
+    sanction_no = req.sanction_order_no.strip() if req.sanction_order_no else sc.sanction_order_no
+
+    disb = ScholarshipDisbursement(
+        scholarship_id=sc.id,
+        amount=inst_amount,
+        disbursement_date=disb_date,
+        sanction_order_no=sanction_no,
+        remarks=req.remarks.strip() if req.remarks else f"Disbursement received on {disb_date}"
+    )
+    db.add(disb)
+    db.flush()
+
+    new_received = quantize_amount(current_received + inst_amount)
+    sc.received_amount = new_received
+    sc.credit_date = disb_date
+    if sanction_no:
+        sc.sanction_order_no = sanction_no
+
+    if new_received >= claim_amount:
+        sc.status = "RECEIVED"
+        sc.remarks = f"Fully Disbursed on {disb_date}"
+    else:
+        sc.status = "PARTIALLY_RECEIVED"
+        rem = quantize_amount(claim_amount - new_received)
+        sc.remarks = f"Partially Disbursed: ₹{new_received} received, ₹{rem} remaining"
 
     log_audit(
         db,
-        action="SCHOLARSHIP_RECEIVED",
+        action="SCHOLARSHIP_DISBURSEMENT",
         entity_name="scholarships",
         entity_id=sc.id,
         user_id=current_user.id if current_user else None,
         details={
             "student_id": sc.student_id,
-            "amount": str(sc.amount),
+            "disbursement_amount": str(inst_amount),
+            "new_total_received": str(sc.received_amount),
+            "remaining_due": str(claim_amount - sc.received_amount),
+            "status": sc.status,
             "sanction_order_no": sc.sanction_order_no,
             "credit_date": str(sc.credit_date)
         }
@@ -174,12 +272,15 @@ def mark_scholarship_pending(
         raise HTTPException(status_code=404, detail="Scholarship record not found")
 
     sc.status = "NOT_RECEIVED"
+    sc.received_amount = Decimal("0.00")
     sc.credit_date = None
     sc.remarks = "Not Received"
 
+    db.query(ScholarshipDisbursement).filter(ScholarshipDisbursement.scholarship_id == sc.id).delete()
+
     log_audit(
         db,
-        action="SCHOLARSHIP_PENDING",
+        action="SCHOLARSHIP_RESET",
         entity_name="scholarships",
         entity_id=sc.id,
         user_id=current_user.id if current_user else None,
@@ -192,5 +293,65 @@ def mark_scholarship_pending(
     recalculate_student_balances(sc.student_id, db)
     db.refresh(sc)
     return serialize_scholarship(sc)
+
+@router.delete("/{scholarship_id}/disbursements/{disbursement_id}", response_model=ScholarshipCreditResponse)
+def delete_scholarship_disbursement(
+    scholarship_id: int,
+    disbursement_id: int,
+    current_user: User = Depends(require_accountant_or_admin),
+    db: Session = Depends(get_db)
+):
+    sc = db.query(ScholarshipCredit).filter(ScholarshipCredit.id == scholarship_id).first()
+    if not sc:
+        raise HTTPException(status_code=404, detail="Scholarship record not found")
+
+    disb = db.query(ScholarshipDisbursement).filter(
+        ScholarshipDisbursement.id == disbursement_id,
+        ScholarshipDisbursement.scholarship_id == scholarship_id
+    ).first()
+    if not disb:
+        raise HTTPException(status_code=404, detail="Disbursement entry not found")
+
+    removed_amt = quantize_amount(disb.amount)
+    db.delete(disb)
+    db.flush()
+
+    rem_disbs = db.query(ScholarshipDisbursement).filter(ScholarshipDisbursement.scholarship_id == scholarship_id).all()
+    new_received = sum([quantize_amount(d.amount) for d in rem_disbs], Decimal("0.00"))
+    sc.received_amount = new_received
+
+    claim_amount = quantize_amount(sc.amount)
+    if new_received <= Decimal("0.00"):
+        sc.status = "NOT_RECEIVED"
+        sc.credit_date = None
+        sc.remarks = "Not Received"
+    elif new_received >= claim_amount:
+        sc.status = "RECEIVED"
+        sc.credit_date = max([d.disbursement_date for d in rem_disbs])
+        sc.remarks = "Fully Disbursed"
+    else:
+        sc.status = "PARTIALLY_RECEIVED"
+        sc.credit_date = max([d.disbursement_date for d in rem_disbs])
+        rem = quantize_amount(claim_amount - new_received)
+        sc.remarks = f"Partially Disbursed: ₹{new_received} received, ₹{rem} remaining"
+
+    log_audit(
+        db,
+        action="DELETE_SCHOLARSHIP_DISBURSEMENT",
+        entity_name="scholarships",
+        entity_id=sc.id,
+        user_id=current_user.id if current_user else None,
+        details={
+            "student_id": sc.student_id,
+            "deleted_amount": str(removed_amt),
+            "new_received": str(new_received)
+        }
+    )
+
+    db.commit()
+    recalculate_student_balances(sc.student_id, db)
+    db.refresh(sc)
+    return serialize_scholarship(sc)
+
 
 

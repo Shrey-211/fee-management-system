@@ -103,6 +103,7 @@ class StudentResponse(StudentBase):
     scholarship_total: Decimal = Decimal("0.00")
     scholarship_received: Decimal = Decimal("0.00")
     scholarship_pending: Decimal = Decimal("0.00")
+    scholarship_status: str = "NONE"
     created_at: Optional[datetime] = None
 
     class Config:

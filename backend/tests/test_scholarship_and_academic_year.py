@@ -63,11 +63,18 @@ def test_student_academic_year_and_scholarship_lifecycle():
     assert updated_sc["sanction_order_no"] == "MAHA-DBT-2026-9999"
     assert updated_sc["credit_date"] == "2026-11-14"
 
-    # 5. Check student details reflecting updated received scholarship
+    # 5. Check student details reflecting updated received scholarship and status consistency
     detail_res = client.get(f"/api/students/{student_id}", headers=headers)
     assert detail_res.status_code == 200
     detail = detail_res.json()
     assert Decimal(str(detail["scholarship_received"])) == Decimal(str(target_sc["amount"]))
+    assert detail["scholarship_status"] in ["PARTIAL", "RECEIVED"]
+
+    # Filter student directory by partial / received
+    if detail["scholarship_status"] == "PARTIAL":
+        p_res = client.get("/api/students?scholarship_status=PARTIAL", headers=headers)
+        assert p_res.status_code == 200
+        assert any(st["id"] == student_id for st in p_res.json())
 
     # 6. Mark back to pending
     reset_res = client.put(f"/api/scholarships/{target_sc['id']}/mark-pending", headers=headers)
@@ -75,4 +82,87 @@ def test_student_academic_year_and_scholarship_lifecycle():
     reset_sc = reset_res.json()
     assert reset_sc["status"] == "NOT_RECEIVED"
     assert reset_sc["credit_date"] is None
+
+    # Check student is NOT_RECEIVED again
+    detail_after = client.get(f"/api/students/{student_id}", headers=headers).json()
+    assert detail_after["scholarship_status"] == "NOT_RECEIVED"
+
+
+def test_partial_installment_disbursements_lifecycle():
+    # 1. Login as Admin
+    login_res = client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 2. Create Student with SC category (Tuition: ₹40,000, Dev: ₹15,000)
+    student_payload = {
+        "full_name": "Pooja Jadhav",
+        "gender": "FEMALE",
+        "category": "SC",
+        "academic_year": "25-26"
+    }
+    create_res = client.post("/api/students", json=student_payload, headers=headers)
+    assert create_res.status_code == 200
+    student_id = create_res.json()["id"]
+
+    sc_res = client.get(f"/api/scholarships?student_id={student_id}", headers=headers)
+    scholarships = sc_res.json()
+    assert len(scholarships) >= 1
+    tuition_sc = [s for s in scholarships if "Tuition" in (s["fee_head_name"] or "") or s["amount"] == 40000.0][0]
+    total_claim = Decimal(str(tuition_sc["amount"]))
+
+    # 3. First installment: Receive ₹15,000 partial step
+    step1_req = {
+        "amount": 15000.0,
+        "sanction_order_no": "MAHA-TERM1-001",
+        "credit_date": "2026-11-14",
+        "remarks": "Term 1 installment credited"
+    }
+    step1_res = client.put(f"/api/scholarships/{tuition_sc['id']}/mark-received", json=step1_req, headers=headers)
+    assert step1_res.status_code == 200
+    sc_data = step1_res.json()
+    assert sc_data["status"] == "PARTIALLY_RECEIVED"
+    assert Decimal(str(sc_data["received_amount"])) == Decimal("15000.00")
+    assert Decimal(str(sc_data["remaining_amount"])) == total_claim - Decimal("15000.00")
+    assert len(sc_data["disbursements"]) == 1
+    assert Decimal(str(sc_data["disbursements"][0]["amount"])) == Decimal("15000.00")
+    disb_1_id = sc_data["disbursements"][0]["id"]
+
+    # 4. Verify Student Profile & Directory reflect partial step
+    student_detail = client.get(f"/api/students/{student_id}", headers=headers).json()
+    assert Decimal(str(student_detail["scholarship_received"])) >= Decimal("15000.00")
+    assert student_detail["scholarship_status"] == "PARTIAL"
+
+    # 5. Overpayment guard: attempt to disburse more than remaining
+    bad_req = {
+        "amount": float(total_claim),
+        "sanction_order_no": "TOO_MUCH"
+    }
+    bad_res = client.put(f"/api/scholarships/{tuition_sc['id']}/mark-received", json=bad_req, headers=headers)
+    assert bad_res.status_code == 400
+
+    # 6. Second installment: Receive the exact remaining amount
+    remaining_due = float(total_claim - Decimal("15000.00"))
+    step2_req = {
+        "amount": remaining_due,
+        "sanction_order_no": "MAHA-TERM2-002",
+        "credit_date": "2026-11-14",
+        "remarks": "Term 2 final installment"
+    }
+    step2_res = client.put(f"/api/scholarships/{tuition_sc['id']}/mark-received", json=step2_req, headers=headers)
+    assert step2_res.status_code == 200
+    sc_data2 = step2_res.json()
+    assert sc_data2["status"] == "RECEIVED"
+    assert Decimal(str(sc_data2["received_amount"])) == total_claim
+    assert Decimal(str(sc_data2["remaining_amount"])) == Decimal("0.00")
+    assert len(sc_data2["disbursements"]) == 2
+
+    # 7. Delete an installment: test deletion of disbursement step
+    del_res = client.delete(f"/api/scholarships/{tuition_sc['id']}/disbursements/{disb_1_id}", headers=headers)
+    assert del_res.status_code == 200
+    after_del = del_res.json()
+    assert Decimal(str(after_del["received_amount"])) == total_claim - Decimal("15000.00")
+    assert after_del["status"] == "PARTIALLY_RECEIVED"
+    assert len(after_del["disbursements"]) == 1
+
 

@@ -33,8 +33,21 @@ def build_student_response(student: Student) -> dict:
     # Scholarship calculations
     student_scholarships = getattr(student, 'scholarships', []) or []
     scholarship_total = sum([quantize_amount(s.amount) for s in student_scholarships], Decimal("0.00"))
-    scholarship_received = sum([quantize_amount(s.amount) for s in student_scholarships if getattr(s, 'status', 'NOT_RECEIVED') == "RECEIVED"], Decimal("0.00"))
-    scholarship_pending = sum([quantize_amount(s.amount) for s in student_scholarships if getattr(s, 'status', 'NOT_RECEIVED') != "RECEIVED"], Decimal("0.00"))
+    scholarship_received = sum([
+        quantize_amount(getattr(s, 'received_amount', None) or (s.amount if (getattr(s, 'status', None) or '').strip().upper() == "RECEIVED" else Decimal("0.00")))
+        for s in student_scholarships
+    ], Decimal("0.00"))
+    scholarship_pending = quantize_amount(max(Decimal("0.00"), scholarship_total - scholarship_received))
+
+    if scholarship_total > Decimal("0.00"):
+        if scholarship_pending <= Decimal("0.00"):
+            scholarship_status = "RECEIVED"
+        elif scholarship_received > Decimal("0.00"):
+            scholarship_status = "PARTIAL"
+        else:
+            scholarship_status = "NOT_RECEIVED"
+    else:
+        scholarship_status = "NONE"
 
     return {
         "id": student.id,
@@ -63,7 +76,8 @@ def build_student_response(student: Student) -> dict:
         "overall_balance": overall_balance,
         "scholarship_total": scholarship_total,
         "scholarship_received": scholarship_received,
-        "scholarship_pending": scholarship_pending
+        "scholarship_pending": scholarship_pending,
+        "scholarship_status": scholarship_status
     }
 
 @router.get("", response_model=List[StudentResponse])
@@ -73,6 +87,7 @@ def get_students(
     gender: Optional[str] = None,
     academic_year: Optional[str] = None,
     has_dues_only: Optional[bool] = False,
+    scholarship_status: Optional[str] = Query(None, description="RECEIVED, PARTIAL, NOT_RECEIVED, HAS_SCHOLARSHIP, NONE"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -96,6 +111,19 @@ def get_students(
 
     if has_dues_only:
         results = [r for r in results if r["overall_balance"] > Decimal("0.00")]
+
+    if scholarship_status:
+        st = scholarship_status.strip().upper()
+        if st == "RECEIVED":
+            results = [r for r in results if r["scholarship_status"] == "RECEIVED"]
+        elif st == "PARTIAL":
+            results = [r for r in results if r["scholarship_status"] == "PARTIAL"]
+        elif st == "NOT_RECEIVED":
+            results = [r for r in results if r["scholarship_status"] == "NOT_RECEIVED"]
+        elif st == "HAS_SCHOLARSHIP":
+            results = [r for r in results if r["scholarship_status"] != "NONE"]
+        elif st == "NONE":
+            results = [r for r in results if r["scholarship_status"] == "NONE"]
 
     return results
 
@@ -245,8 +273,32 @@ def get_student_detail(
     ]
 
     # Scholarships
-    scholarships = [
-        {
+    scholarships = []
+    for sc in student.scholarships:
+        amt = quantize_amount(sc.amount)
+        rec = quantize_amount(getattr(sc, 'received_amount', None) or (amt if getattr(sc, 'status', None) == 'RECEIVED' else Decimal("0.00")))
+        rem = quantize_amount(max(Decimal("0.00"), amt - rec))
+        if rec <= Decimal("0.00"):
+            st = "NOT_RECEIVED"
+        elif rec >= amt:
+            st = "RECEIVED"
+        else:
+            st = "PARTIALLY_RECEIVED"
+
+        disb_list = [
+            {
+                "id": d.id,
+                "scholarship_id": d.scholarship_id,
+                "amount": quantize_amount(d.amount),
+                "disbursement_date": d.disbursement_date,
+                "sanction_order_no": d.sanction_order_no,
+                "remarks": d.remarks,
+                "created_at": d.created_at
+            }
+            for d in (getattr(sc, 'disbursements', []) or [])
+        ]
+
+        scholarships.append({
             "id": sc.id,
             "student_id": sc.student_id,
             "student_name": student.full_name,
@@ -254,17 +306,18 @@ def get_student_detail(
             "student_category": student.category,
             "academic_year": student.academic_year,
             "fee_head_id": sc.fee_head_id,
-            "fee_head_name": sc.fee_head.name if sc.fee_head else None,
+            "fee_head_name": sc.fee_head.name if sc.fee_head else "General Tuition/Dev",
             "scholarship_name": sc.scholarship_name,
             "sanction_order_no": sc.sanction_order_no,
             "credit_date": sc.credit_date,
-            "amount": sc.amount,
-            "status": getattr(sc, 'status', 'NOT_RECEIVED'),
-            "remarks": sc.remarks,
-            "created_at": sc.created_at
-        }
-        for sc in student.scholarships
-    ]
+            "amount": amt,
+            "received_amount": rec,
+            "remaining_amount": rem,
+            "status": st,
+            "remarks": sc.remarks or ("Not Received" if st == "NOT_RECEIVED" else (f"Partially Received (₹{rec})" if st == "PARTIALLY_RECEIVED" else "Received")),
+            "created_at": sc.created_at,
+            "disbursements": disb_list
+        })
 
     base_resp.update({
         "fee_heads": fee_heads,

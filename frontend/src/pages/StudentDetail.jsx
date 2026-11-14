@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { 
   ArrowLeft, Receipt, Plus, AlertCircle, 
-  Mail, Award, CheckCircle, Clock, FileText, Phone, MapPin, Edit3, X 
+  Mail, Award, CheckCircle, Clock, FileText, Phone, MapPin, Edit3, X, Trash2 
 } from 'lucide-react';
 import ModalDialog from '../components/ModalDialog';
 
@@ -21,6 +21,28 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
   const [editForm, setEditForm] = useState(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState('');
+
+  // Edit Payment State
+  const [editingPayment, setEditingPayment] = useState(null);
+  const [editPhysicalReceiptNo, setEditPhysicalReceiptNo] = useState('');
+  const [editPaymentDate, setEditPaymentDate] = useState('');
+  const [editPaymentMode, setEditPaymentMode] = useState('CASH');
+  const [editRemarks, setEditRemarks] = useState('');
+  const [editItems, setEditItems] = useState([]);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editPaymentError, setEditPaymentError] = useState('');
+
+  // Scholarship Installment Modal State
+  const [scholarshipModal, setScholarshipModal] = useState({
+    isOpen: false,
+    sc: null,
+    amount: '',
+    sanctionNo: '',
+    date: new Date().toISOString().split('T')[0],
+    remarks: '',
+    error: '',
+    submitting: false
+  });
 
   const loadStudent = async () => {
     setLoading(true);
@@ -111,26 +133,150 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
     setTimeout(() => setEmailStatus(''), 6000);
   };
 
-  const handleMarkScholarshipReceived = async (scId) => {
-    const sanctionNo = window.prompt("Enter Sanction Order / DBT Reference # (optional):", "");
+  const handleOpenReceiveScholarship = (sc) => {
+    const rem = sc.remaining_amount !== undefined 
+      ? Number(sc.remaining_amount) 
+      : Math.max(0, Number(sc.amount) - Number(sc.received_amount || 0));
+
+    setScholarshipModal({
+      isOpen: true,
+      sc: sc,
+      amount: rem > 0 ? rem.toString() : '',
+      sanctionNo: sc.sanction_order_no || '',
+      date: new Date().toISOString().split('T')[0],
+      remarks: '',
+      error: '',
+      submitting: false
+    });
+  };
+
+  const handleSubmitScholarshipPayment = async (e) => {
+    e.preventDefault();
+    const { sc, amount, sanctionNo, date, remarks } = scholarshipModal;
+    const amt = parseFloat(amount);
+    const rem = sc.remaining_amount !== undefined 
+      ? Number(sc.remaining_amount) 
+      : Math.max(0, Number(sc.amount) - Number(sc.received_amount || 0));
+
+    if (isNaN(amt) || amt <= 0) {
+      setScholarshipModal(prev => ({ ...prev, error: 'Please enter a valid amount greater than ₹0.' }));
+      return;
+    }
+    if (amt > rem + 0.001) {
+      setScholarshipModal(prev => ({ ...prev, error: `Amount cannot exceed remaining balance due (₹${rem.toLocaleString('en-IN')}).` }));
+      return;
+    }
+
+    setScholarshipModal(prev => ({ ...prev, submitting: true, error: '' }));
     try {
-      await api.markScholarshipReceived(scId, {
+      await api.markScholarshipReceived(sc.id, {
+        amount: amt,
         sanction_order_no: sanctionNo ? sanctionNo.trim() : null,
-        credit_date: new Date().toISOString().split('T')[0]
+        credit_date: date || null,
+        remarks: remarks ? remarks.trim() : null
       });
+      setScholarshipModal({
+        isOpen: false,
+        sc: null,
+        amount: '',
+        sanctionNo: '',
+        date: new Date().toISOString().split('T')[0],
+        remarks: '',
+        error: '',
+        submitting: false
+      });
+      loadStudent();
+    } catch (err) {
+      setScholarshipModal(prev => ({ ...prev, submitting: false, error: err.message || 'Failed to record disbursement.' }));
+    }
+  };
+
+  const handleMarkScholarshipPending = async (scId) => {
+    if (!window.confirm("Reset all recorded disbursements for this scholarship back to NOT RECEIVED?")) return;
+    try {
+      await api.markScholarshipPending(scId);
       loadStudent();
     } catch (err) {
       alert(err.message || "Failed to update scholarship status.");
     }
   };
 
-  const handleMarkScholarshipPending = async (scId) => {
-    if (!window.confirm("Reset this scholarship back to NOT RECEIVED?")) return;
+  const handleOpenEditPayment = (p) => {
+    setEditingPayment(p);
+    setEditPhysicalReceiptNo(p.physical_receipt_no || '');
+    setEditPaymentDate(p.payment_date || '');
+    setEditPaymentMode(p.payment_mode || 'CASH');
+    setEditRemarks(p.remarks || '');
+    setEditItems((p.items || []).map(itm => ({
+      ...itm,
+      amount: itm.amount
+    })));
+    setEditPaymentError('');
+  };
+
+  const handleEditPaymentItemChange = (index, val) => {
+    setEditItems(prev => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], amount: val };
+      return copy;
+    });
+  };
+
+  const calculateEditPaymentTotal = () => {
+    return editItems.reduce((sum, itm) => sum + (parseFloat(itm.amount) || 0), 0);
+  };
+
+  const handleSaveEditPayment = async (e) => {
+    e.preventDefault();
+    if (!editingPayment) return;
+    setEditPaymentError('');
+
+    const formattedItems = [];
+    for (const itm of editItems) {
+      const amt = parseFloat(itm.amount);
+      if (isNaN(amt) || amt <= 0) {
+        setEditPaymentError(`Amount for "${itm.fee_head_name || itm.fine_event_name}" must be greater than ₹0.`);
+        return;
+      }
+      formattedItems.push({
+        fee_head_id: itm.fee_head_id || null,
+        fine_id: itm.fine_id || null,
+        amount: amt
+      });
+    }
+
+    if (formattedItems.length === 0) {
+      setEditPaymentError('Payment must have at least one line item with an amount.');
+      return;
+    }
+
+    setEditSubmitting(true);
     try {
-      await api.markScholarshipPending(scId);
+      await api.updatePayment(editingPayment.id, {
+        physical_receipt_no: (editPhysicalReceiptNo || '').trim() || null,
+        payment_date: editPaymentDate || null,
+        payment_mode: editPaymentMode,
+        remarks: (editRemarks || '').trim() || null,
+        items: formattedItems
+      });
+      setEditingPayment(null);
       loadStudent();
     } catch (err) {
-      alert(err.message || "Failed to update scholarship status.");
+      setEditPaymentError(err.message || 'Failed to update payment receipt.');
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
+  const handleDeletePayment = async (p) => {
+    const confirmMsg = `Are you sure you want to delete payment receipt ${p.internal_receipt_no} for ₹${Number(p.total_amount).toLocaleString('en-IN')}?\n\nThis will restore the student's pending balance in the ledger.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      await api.deletePayment(p.id);
+      loadStudent();
+    } catch (err) {
+      alert(err.message || 'Failed to delete payment receipt.');
     }
   };
 
@@ -251,13 +397,26 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
                 <p className="text-lg font-black text-amber-700 font-mono">
                   ₹{Number(student.scholarship_total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </p>
-                <p className="text-[10px] font-semibold text-slate-500">
-                  {Number(student.scholarship_pending || 0) > 0 ? (
-                    <span className="text-amber-600">₹{Number(student.scholarship_pending).toLocaleString('en-IN')} Pending</span>
+                <div className="text-[10px] font-semibold mt-0.5">
+                  {Number(student.scholarship_pending || 0) === 0 ? (
+                    <span className="text-emerald-700 font-bold flex items-center justify-end gap-1">
+                      <CheckCircle className="w-3 h-3 text-emerald-600" /> All Received
+                    </span>
+                  ) : Number(student.scholarship_received || 0) > 0 ? (
+                    <div className="flex flex-col text-right">
+                      <span className="text-emerald-700 font-bold">
+                        ₹{Number(student.scholarship_received).toLocaleString('en-IN')} Received
+                      </span>
+                      <span className="text-amber-700 font-medium">
+                        ₹{Number(student.scholarship_pending).toLocaleString('en-IN')} Pending
+                      </span>
+                    </div>
                   ) : (
-                    <span className="text-emerald-600">Disbursed</span>
+                    <span className="text-amber-700 flex items-center justify-end gap-1">
+                      <Clock className="w-3 h-3 text-amber-600" /> ₹{Number(student.scholarship_pending).toLocaleString('en-IN')} Pending
+                    </span>
                   )}
-                </p>
+                </div>
               </div>
             )}
             <div>
@@ -377,7 +536,9 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
                 <tr>
                   <th className="px-4 py-2.5">Fee Head</th>
                   <th className="px-4 py-2.5">Scholarship Scheme</th>
-                  <th className="px-4 py-2.5 text-right">Claim Amount</th>
+                  <th className="px-4 py-2.5 text-right">Sanctioned (₹)</th>
+                  <th className="px-4 py-2.5 text-right">Received (₹)</th>
+                  <th className="px-4 py-2.5 text-right">Remaining Due (₹)</th>
                   <th className="px-4 py-2.5">Status</th>
                   <th className="px-4 py-2.5">Sanction Order #</th>
                   <th className="px-4 py-2.5">Credit Date</th>
@@ -386,7 +547,12 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
                 {student.scholarships.map((sc) => {
-                  const isRec = sc.status === 'RECEIVED';
+                  const amt = Number(sc.amount || 0);
+                  const rec = Number(sc.received_amount !== undefined ? sc.received_amount : (sc.status === 'RECEIVED' ? sc.amount : 0));
+                  const rem = sc.remaining_amount !== undefined ? Number(sc.remaining_amount) : Math.max(0, amt - rec);
+                  const isRec = sc.status === 'RECEIVED' || rem <= 0.001;
+                  const isPartial = sc.status === 'PARTIALLY_RECEIVED' || (rec > 0 && rem > 0.001);
+
                   return (
                     <tr key={sc.id} className="hover:bg-slate-50/60">
                       <td className="px-4 py-3 font-bold text-slate-800">
@@ -394,12 +560,26 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
                       </td>
                       <td className="px-4 py-3 text-slate-700">{sc.scholarship_name}</td>
                       <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">
-                        ₹{Number(sc.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        ₹{amt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700">
+                        ₹{rec.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono font-bold">
+                        {rem > 0.001 ? (
+                          <span className="text-amber-700">₹{rem.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                        ) : (
+                          <span className="text-slate-400">₹0.00</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         {isRec ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                            <CheckCircle className="w-3 h-3 text-emerald-600" /> RECEIVED
+                            <CheckCircle className="w-3 h-3 text-emerald-600" /> FULLY RECEIVED
+                          </span>
+                        ) : isPartial ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300">
+                            <Clock className="w-3 h-3 text-blue-600" /> PARTIAL STEP
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
@@ -409,22 +589,26 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
                       </td>
                       <td className="px-4 py-3 font-mono text-slate-600">{sc.sanction_order_no || '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{sc.credit_date || <span className="text-amber-600 italic">Pending Govt</span>}</td>
-                      <td className="px-4 py-3 text-center">
-                        {!isRec ? (
-                          <button
-                            onClick={() => handleMarkScholarshipReceived(sc.id)}
-                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold transition shadow-sm"
-                          >
-                            Mark Received
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleMarkScholarshipPending(sc.id)}
-                            className="text-slate-400 hover:text-amber-600 text-[11px] transition"
-                          >
-                            Reset
-                          </button>
-                        )}
+                      <td className="px-4 py-3 text-center whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-2">
+                          {rem > 0.001 && (
+                            <button
+                              onClick={() => handleOpenReceiveScholarship(sc)}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold transition shadow-sm"
+                            >
+                              + Receive Step
+                            </button>
+                          )}
+                          {rec > 0.001 && (
+                            <button
+                              onClick={() => handleMarkScholarshipPending(sc.id)}
+                              className="text-slate-400 hover:text-amber-600 text-[11px] transition"
+                              title="Reset all recorded steps for this scholarship"
+                            >
+                              Reset
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -541,12 +725,13 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
                 <th className="px-4 py-2.5">Payment Mode</th>
                 <th className="px-4 py-2.5">Allocation Items</th>
                 <th className="px-4 py-2.5 text-right font-bold">Total Amount</th>
+                <th className="px-4 py-2.5 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {student.payments.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-4 py-6 text-center text-slate-400">
+                  <td colSpan="7" className="px-4 py-6 text-center text-slate-400">
                     No payment receipts logged yet.
                   </td>
                 </tr>
@@ -572,6 +757,24 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
                     </td>
                     <td className="px-4 py-3 text-right font-mono font-black text-slate-900">
                       ₹{Number(p.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => handleOpenEditPayment(p)}
+                          className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition"
+                          title="Edit Receipt Details"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeletePayment(p)}
+                          className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded transition"
+                          title="Delete Receipt & Restore Dues"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -784,6 +987,320 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
         confirmVariant={alertModal.type === 'danger' ? 'danger' : 'primary'}
         onClose={() => setAlertModal({ isOpen: false, title: '', message: '', type: 'info' })}
       />
+
+      {/* Edit Payment Receipt Modal */}
+      {editingPayment && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold flex items-center gap-1.5">
+                  <Edit3 className="w-4 h-4 text-blue-400" /> Edit Payment Receipt
+                </h3>
+                <p className="text-xs text-slate-400">
+                  System Receipt #{editingPayment.internal_receipt_no} | Student: {student.full_name}
+                </p>
+              </div>
+              <button
+                onClick={() => setEditingPayment(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditPayment} className="p-6 space-y-4 max-h-[85vh] overflow-y-auto text-xs">
+              {editPaymentError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg font-medium">
+                  {editPaymentError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Manual Receipt #</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 1042"
+                    value={editPhysicalReceiptNo}
+                    onChange={(e) => setEditPhysicalReceiptNo(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 font-mono font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Receipt Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={editPaymentDate}
+                    onChange={(e) => setEditPaymentDate(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Payment Mode *</label>
+                  <select
+                    value={editPaymentMode}
+                    onChange={(e) => setEditPaymentMode(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
+                  >
+                    <option value="CASH">Cash</option>
+                    <option value="UPI">UPI / QR</option>
+                    <option value="CHEQUE">Cheque</option>
+                    <option value="DD">Demand Draft (DD)</option>
+                    <option value="NEFT">NEFT / Bank Transfer</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Line items allocation edit */}
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <p className="font-bold text-slate-800">Fee Head / Fine Line Item Allocation (₹):</p>
+                <div className="space-y-2">
+                  {editItems.map((itm, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+                      <span className="font-semibold text-slate-800">
+                        {itm.fee_head_name || `Fine: ${itm.fine_event_name}`}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-slate-500 font-bold">₹</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          required
+                          min="0.01"
+                          value={itm.amount}
+                          onChange={(e) => handleEditPaymentItemChange(idx, e.target.value)}
+                          className="w-28 px-2 py-1 border rounded focus:ring-2 focus:ring-blue-600 font-mono font-bold text-right text-slate-900 bg-white"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between mt-2">
+                  <span className="font-bold text-emerald-900">Total Receipt Amount:</span>
+                  <span className="font-mono font-black text-emerald-800 text-sm">
+                    ₹{calculateEditPaymentTotal().toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Remarks / Note</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Corrected receipt entry"
+                  value={editRemarks}
+                  onChange={(e) => setEditRemarks(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setEditingPayment(null)}
+                  className="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-700 hover:bg-slate-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSubmitting || calculateEditPaymentTotal() <= 0}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow transition disabled:opacity-50"
+                >
+                  {editSubmitting ? 'Updating...' : 'Save & Recalculate Ledger'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Scholarship Disbursement / Installment Modal */}
+      {scholarshipModal.isOpen && scholarshipModal.sc && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-emerald-50 text-emerald-700 rounded-lg">
+                  <Award className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base">Record Government Scholarship Step</h3>
+                  <p className="text-xs text-slate-500">
+                    {student.full_name} &bull; {scholarshipModal.sc.fee_head_name || 'General'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setScholarshipModal(prev => ({ ...prev, isOpen: false }))}
+                className="text-slate-400 hover:text-slate-600 rounded-lg p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {(() => {
+              const sc = scholarshipModal.sc;
+              const totalClaim = Number(sc.amount || 0);
+              const alreadyRec = Number(sc.received_amount !== undefined ? sc.received_amount : (sc.status === 'RECEIVED' ? sc.amount : 0));
+              const currentRem = sc.remaining_amount !== undefined ? Number(sc.remaining_amount) : Math.max(0, totalClaim - alreadyRec);
+              const enteredVal = parseFloat(scholarshipModal.amount) || 0;
+              const afterRem = Math.max(0, currentRem - enteredVal);
+
+              return (
+                <form onSubmit={handleSubmitScholarshipPayment} className="space-y-4 pt-4 text-xs">
+                  {scholarshipModal.error && (
+                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                      <span>{scholarshipModal.error}</span>
+                    </div>
+                  )}
+
+                  {/* Summary Banner */}
+                  <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2">
+                    <div className="text-slate-700 font-medium">
+                      Scheme: <span className="font-bold text-slate-900">{sc.scholarship_name}</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 pt-1 border-t border-amber-200/60 text-center">
+                      <div>
+                        <div className="text-[10px] text-slate-500 uppercase font-semibold">Total Claim</div>
+                        <div className="font-mono font-bold text-slate-800">
+                          ₹{totalClaim.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-emerald-700 uppercase font-semibold">Received to Date</div>
+                        <div className="font-mono font-bold text-emerald-700">
+                          ₹{alreadyRec.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-amber-700 uppercase font-semibold">Remaining Due</div>
+                        <div className="font-mono font-black text-amber-800">
+                          ₹{currentRem.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Disbursement Amount Input */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="font-bold text-slate-800">
+                        Disbursement Amount Received in this Step (₹) *
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setScholarshipModal(prev => ({ ...prev, amount: currentRem.toString(), error: '' }))}
+                          className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-semibold transition"
+                        >
+                          Full Due (₹{currentRem.toLocaleString('en-IN')})
+                        </button>
+                        {currentRem > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setScholarshipModal(prev => ({ ...prev, amount: Math.round(currentRem / 2).toString(), error: '' }))}
+                            className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-semibold transition"
+                          >
+                            50% (₹{Math.round(currentRem / 2).toLocaleString('en-IN')})
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      max={currentRem}
+                      required
+                      placeholder={`e.g. ${currentRem}`}
+                      value={scholarshipModal.amount}
+                      onChange={(e) => setScholarshipModal(prev => ({ ...prev, amount: e.target.value, error: '' }))}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 font-mono text-base font-bold text-slate-900"
+                    />
+
+                    {enteredVal > 0 && enteredVal <= currentRem && (
+                      <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-600 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200">
+                        <span>Remaining after this step:</span>
+                        <span className="font-mono font-bold text-slate-900">
+                          ₹{afterRem.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          {afterRem === 0 && (
+                            <span className="ml-1 text-emerald-600 font-semibold">(Will be 100% Cleared)</span>
+                          )}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Sanction Order & Date */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Sanction Order / DBT Ref #
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. MAHA-2026-9812"
+                        value={scholarshipModal.sanctionNo}
+                        onChange={(e) => setScholarshipModal(prev => ({ ...prev, sanctionNo: e.target.value }))}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Disbursement Date *
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={scholarshipModal.date}
+                        onChange={(e) => setScholarshipModal(prev => ({ ...prev, date: e.target.value }))}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Bank Advice / Remarks (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 1st Installment credited via PFMS / Social Welfare"
+                      value={scholarshipModal.remarks}
+                      onChange={(e) => setScholarshipModal(prev => ({ ...prev, remarks: e.target.value }))}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-3 border-t">
+                    <button
+                      type="button"
+                      onClick={() => setScholarshipModal(prev => ({ ...prev, isOpen: false }))}
+                      className="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-700 hover:bg-slate-50 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={scholarshipModal.submitting || !scholarshipModal.amount || parseFloat(scholarshipModal.amount) <= 0}
+                      className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold shadow transition disabled:opacity-50"
+                    >
+                      {scholarshipModal.submitting ? 'Recording...' : 'Confirm & Credit Step'}
+                    </button>
+                  </div>
+                </form>
+              );
+            })()}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

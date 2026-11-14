@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { 
   Search, Plus, Filter, UserCheck, 
-  ChevronRight, ArrowUpDown, X, CheckCircle 
+  ChevronRight, ArrowUpDown, X, CheckCircle, Clock, Award 
 } from 'lucide-react';
 
 export default function Students({ onSelectStudent }) {
@@ -12,6 +12,7 @@ export default function Students({ onSelectStudent }) {
   const [category, setCategory] = useState('');
   const [gender, setGender] = useState('');
   const [academicYearFilter, setAcademicYearFilter] = useState('');
+  const [scholarshipStatusFilter, setScholarshipStatusFilter] = useState('');
   const [hasDuesOnly, setHasDuesOnly] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [feeTypes, setFeeTypes] = useState([]);
@@ -47,6 +48,7 @@ export default function Students({ onSelectStudent }) {
       if (category) params.category = category;
       if (gender) params.gender = gender;
       if (academicYearFilter) params.academic_year = academicYearFilter;
+      if (scholarshipStatusFilter) params.scholarship_status = scholarshipStatusFilter;
       if (hasDuesOnly) params.has_dues_only = true;
 
       const data = await api.getStudents(params);
@@ -63,7 +65,7 @@ export default function Students({ onSelectStudent }) {
       loadStudents();
     }, 250);
     return () => clearTimeout(timer);
-  }, [search, category, gender, academicYearFilter, hasDuesOnly]);
+  }, [search, category, gender, academicYearFilter, scholarshipStatusFilter, hasDuesOnly]);
 
   const handleCreateStudent = async (e) => {
     e.preventDefault();
@@ -204,6 +206,18 @@ export default function Students({ onSelectStudent }) {
             <option value="FEMALE">Female</option>
           </select>
 
+          <select
+            value={scholarshipStatusFilter}
+            onChange={(e) => setScholarshipStatusFilter(e.target.value)}
+            className="py-2 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
+          >
+            <option value="">All Scholarships</option>
+            <option value="RECEIVED">Fully Received</option>
+            <option value="PARTIAL">Partially Received</option>
+            <option value="NOT_RECEIVED">Pending / Not Received</option>
+            <option value="HAS_SCHOLARSHIP">Has Any Scholarship</option>
+          </select>
+
           <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 cursor-pointer select-none">
             <input
               type="checkbox"
@@ -279,19 +293,39 @@ export default function Students({ onSelectStudent }) {
                     </td>
                     <td className="px-4 py-3">
                       {Number(s.scholarship_total || 0) > 0 ? (
-                        Number(s.scholarship_pending || 0) > 0 ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200" title="Government scholarship claim pending disbursement">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                            ₹{Number(s.scholarship_pending).toLocaleString('en-IN')} (Not Received)
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200" title="Scholarship received from Government">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        Number(s.scholarship_pending || 0) === 0 ? (
+                          <span 
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-sm"
+                            title={`Scholarship 100% Received from Government: ₹${Number(s.scholarship_received).toLocaleString('en-IN')}`}
+                          >
+                            <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                             ₹{Number(s.scholarship_received).toLocaleString('en-IN')} (Received)
+                          </span>
+                        ) : Number(s.scholarship_received || 0) > 0 ? (
+                          <div 
+                            className="flex flex-col gap-1"
+                            title={`Partially Received: ₹${Number(s.scholarship_received).toLocaleString('en-IN')} received, ₹${Number(s.scholarship_pending).toLocaleString('en-IN')} pending from Government`}
+                          >
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                              ₹{Number(s.scholarship_received).toLocaleString('en-IN')} Rec
+                            </span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span>
+                              ₹{Number(s.scholarship_pending).toLocaleString('en-IN')} Pend
+                            </span>
+                          </div>
+                        ) : (
+                          <span 
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-sm"
+                            title={`Government scholarship claim pending disbursement: ₹${Number(s.scholarship_pending).toLocaleString('en-IN')}`}
+                          >
+                            <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                            ₹{Number(s.scholarship_pending).toLocaleString('en-IN')} (Not Received)
                           </span>
                         )
                       ) : (
-                        <span className="text-slate-400">—</span>
+                        <span className="text-slate-400 font-mono">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right font-mono text-slate-700">

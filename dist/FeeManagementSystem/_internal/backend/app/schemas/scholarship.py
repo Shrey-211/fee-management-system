@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from decimal import Decimal
 from datetime import date, datetime
 from pydantic import BaseModel, Field, field_validator
@@ -10,6 +10,7 @@ class ScholarshipCreditCreate(BaseModel):
     sanction_order_no: Optional[str] = None
     credit_date: Optional[date] = None
     amount: Decimal = Field(..., gt=0)
+    received_amount: Optional[Decimal] = Decimal("0.00")
     status: str = "NOT_RECEIVED"
     remarks: Optional[str] = None
 
@@ -36,9 +37,17 @@ class ScholarshipCreditCreate(BaseModel):
 
 
 class MarkScholarshipReceivedRequest(BaseModel):
+    amount: Optional[Decimal] = Field(None, gt=0, description="Installment amount received. If omitted, marks full remaining amount.")
     sanction_order_no: Optional[str] = None
     credit_date: Optional[date] = None
     remarks: Optional[str] = None
+
+    @field_validator("amount", mode="before")
+    @classmethod
+    def coerce_amount(cls, v):
+        if v == "" or v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        return v
 
     @field_validator("credit_date", mode="before")
     @classmethod
@@ -55,6 +64,19 @@ class MarkScholarshipReceivedRequest(BaseModel):
         return v
 
 
+class ScholarshipDisbursementResponse(BaseModel):
+    id: int
+    scholarship_id: int
+    amount: Decimal
+    disbursement_date: date
+    sanction_order_no: Optional[str] = None
+    remarks: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
 class ScholarshipCreditResponse(BaseModel):
     id: int
     student_id: int
@@ -68,10 +90,14 @@ class ScholarshipCreditResponse(BaseModel):
     sanction_order_no: Optional[str] = None
     credit_date: Optional[date] = None
     amount: Decimal
+    received_amount: Decimal = Decimal("0.00")
+    remaining_amount: Decimal = Decimal("0.00")
     status: str = "NOT_RECEIVED"
     remarks: Optional[str] = None
     created_at: Optional[datetime] = None
+    disbursements: List[ScholarshipDisbursementResponse] = []
 
     class Config:
         from_attributes = True
+
 

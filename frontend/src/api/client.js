@@ -188,6 +188,13 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(data)
   }),
+  updatePayment: (id, data) => request(`/payments/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
+  deletePayment: (id) => request(`/payments/${id}`, {
+    method: 'DELETE'
+  }),
 
   // Fines
   getFines: (params = {}) => {
@@ -218,6 +225,9 @@ export const api = {
   }),
   markScholarshipPending: (id) => request(`/scholarships/${id}/mark-pending`, {
     method: 'PUT'
+  }),
+  deleteScholarshipDisbursement: (scholarshipId, disbursementId) => request(`/scholarships/${scholarshipId}/disbursements/${disbursementId}`, {
+    method: 'DELETE'
   }),
 
   // Reports

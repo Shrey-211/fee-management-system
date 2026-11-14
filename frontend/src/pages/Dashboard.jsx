@@ -2,22 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { 
   Receipt, AlertCircle, Users, 
-  TrendingUp, Plus, Download, Clock 
+  TrendingUp, Plus, Download, Clock, Award, CheckCircle 
 } from 'lucide-react';
 
 export default function Dashboard({ setTab, onNewPaymentClick, onNewFineClick }) {
   const [students, setStudents] = useState([]);
   const [recentPayments, setRecentPayments] = useState([]);
+  const [scholarships, setScholarships] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
     try {
-      const [studs, pays] = await Promise.all([
+      const [studs, pays, scs] = await Promise.all([
         api.getStudents(),
-        api.getPayments({ limit: 8 })
+        api.getPayments({ limit: 8 }),
+        api.getScholarships().catch(() => [])
       ]);
-      setStudents(studs);
-      setRecentPayments(pays.slice(0, 8));
+      setStudents(studs || []);
+      setRecentPayments((pays || []).slice(0, 8));
+      setScholarships(scs || []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -33,6 +36,13 @@ export default function Dashboard({ setTab, onNewPaymentClick, onNewFineClick })
   const totalCollected = students.reduce((acc, s) => acc + Number(s.total_fee_paid || 0), 0);
   const totalFinesDue = students.reduce((acc, s) => acc + Number(s.total_fines_balance || 0), 0);
 
+  // Government Scholarship calculations
+  const totalScholarshipClaims = scholarships.reduce((sum, s) => sum + Number(s.amount || 0), 0);
+  const scholarshipReceived = scholarships.filter(s => s.status === 'RECEIVED').reduce((sum, s) => sum + Number(s.amount || 0), 0);
+  const scholarshipPending = scholarships.filter(s => s.status !== 'RECEIVED').reduce((sum, s) => sum + Number(s.amount || 0), 0);
+  const receivedCount = scholarships.filter(s => s.status === 'RECEIVED').length;
+  const pendingCount = scholarships.filter(s => s.status !== 'RECEIVED').length;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[500px]">
@@ -44,67 +54,101 @@ export default function Dashboard({ setTab, onNewPaymentClick, onNewFineClick })
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Total Collected */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Fees Collected</span>
-            <div className="p-2 bg-emerald-100 text-emerald-700 rounded-lg">
-              <TrendingUp className="w-5 h-5" />
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Student Fees Collected</span>
+              <div className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg">
+                <TrendingUp className="w-4 h-4" />
+              </div>
             </div>
+            <p className="text-xl font-black text-slate-900 mt-2 font-mono">
+              ₹{totalCollected.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </p>
           </div>
-          <p className="text-2xl font-black text-slate-900 mt-2 font-mono">
-            ₹{totalCollected.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-          </p>
-          <p className="mt-2 text-xs text-slate-500">Total payments received to date</p>
+          <p className="mt-2 text-[11px] text-slate-500">Direct student payments</p>
         </div>
 
         {/* Total Outstanding */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Balance Due</span>
-            <div className="p-2 bg-rose-100 text-rose-700 rounded-lg">
-              <Receipt className="w-5 h-5" />
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Student Balance Due</span>
+              <div className="p-1.5 bg-rose-100 text-rose-700 rounded-lg">
+                <Receipt className="w-4 h-4" />
+              </div>
             </div>
+            <p className="text-xl font-black text-rose-600 mt-2 font-mono">
+              ₹{totalOutstanding.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </p>
           </div>
-          <p className="text-2xl font-black text-rose-600 mt-2 font-mono">
-            ₹{totalOutstanding.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-          </p>
-          <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-            <span>Pending dues across all students</span>
+          <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+            <span>Pending dues</span>
             <button onClick={() => setTab('reports')} className="text-blue-600 hover:underline font-semibold">
               View Dues
             </button>
           </div>
         </div>
 
-        {/* Active Students */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Enrolled Students</span>
-            <div className="p-2 bg-blue-100 text-blue-700 rounded-lg">
-              <Users className="w-5 h-5" />
+        {/* Govt Scholarships Received */}
+        <div className="bg-white p-4 rounded-xl border border-emerald-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Govt Grants Received</span>
+              <div className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg">
+                <CheckCircle className="w-4 h-4" />
+              </div>
             </div>
+            <p className="text-xl font-black text-emerald-700 mt-2 font-mono">
+              ₹{scholarshipReceived.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </p>
           </div>
-          <p className="text-2xl font-black text-slate-900 mt-2 font-mono">{students.length}</p>
-          <p className="mt-2 text-xs text-slate-500">Active student fee profiles</p>
+          <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+            <span>{receivedCount} claims disbursed</span>
+            <button onClick={() => setTab('scholarships')} className="text-emerald-700 hover:underline font-semibold">
+              Scholarships →
+            </button>
+          </div>
         </div>
 
-        {/* Total Fines Due */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Pending Event Fines</span>
-            <div className="p-2 bg-amber-100 text-amber-700 rounded-lg">
-              <AlertCircle className="w-5 h-5" />
+        {/* Govt Scholarships Pending */}
+        <div className="bg-white p-4 rounded-xl border border-amber-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700">Pending Govt Grants</span>
+              <div className="p-1.5 bg-amber-100 text-amber-700 rounded-lg">
+                <Clock className="w-4 h-4" />
+              </div>
             </div>
+            <p className="text-xl font-black text-amber-700 mt-2 font-mono">
+              ₹{scholarshipPending.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </p>
           </div>
-          <p className="text-2xl font-black text-amber-700 mt-2 font-mono">
-            ₹{totalFinesDue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-          </p>
-          <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-            <span>Krishna Utsav, Freshers, etc.</span>
-            <button onClick={() => setTab('fines')} className="text-blue-600 hover:underline font-semibold">
-              View Fines
+          <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+            <span>{pendingCount} claims awaiting</span>
+            <button onClick={() => setTab('scholarships')} className="text-amber-700 hover:underline font-semibold">
+              Track Claims →
+            </button>
+          </div>
+        </div>
+
+        {/* Active Students */}
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Enrolled Students</span>
+              <div className="p-1.5 bg-blue-100 text-blue-700 rounded-lg">
+                <Users className="w-4 h-4" />
+              </div>
+            </div>
+            <p className="text-xl font-black text-slate-900 mt-2 font-mono">{students.length}</p>
+          </div>
+          <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+            <span>Active profiles</span>
+            <button onClick={() => setTab('students')} className="text-blue-600 hover:underline font-semibold">
+              Directory →
             </button>
           </div>
         </div>

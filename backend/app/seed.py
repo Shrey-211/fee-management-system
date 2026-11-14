@@ -97,31 +97,50 @@ def seed_database():
             db.commit()
             print("Standard fee heads seeded.")
 
-        # Safe SQLite column check for concession_type_id on students table
+        # Safe SQLite column check for concession_type_id and scholarship fields
         try:
-            raw_conn = db.connection().connection
-            cursor = raw_conn.cursor()
-            cursor.execute("PRAGMA table_info(students)")
-            cols = [row[1] for row in cursor.fetchall()]
+            from sqlalchemy import text
+            res = db.execute(text("PRAGMA table_info(students)")).fetchall()
+            cols = [row[1] for row in res]
             if cols and "concession_type_id" not in cols:
                 print("Adding concession_type_id column to students table...")
-                cursor.execute("ALTER TABLE students ADD COLUMN concession_type_id INTEGER REFERENCES fee_concession_types(id)")
-                raw_conn.commit()
+                db.execute(text("ALTER TABLE students ADD COLUMN concession_type_id INTEGER REFERENCES fee_concession_types(id)"))
                 db.commit()
 
-            cursor.execute("PRAGMA table_info(scholarship_credits)")
-            sc_info = {row[1]: row[3] for row in cursor.fetchall()}
+            sc_res = db.execute(text("PRAGMA table_info(scholarship_credits)")).fetchall()
+            sc_info = {row[1]: row[3] for row in sc_res}
             if sc_info and "status" not in sc_info:
                 print("Adding status column to scholarship_credits table...")
-                cursor.execute("ALTER TABLE scholarship_credits ADD COLUMN status VARCHAR(20) DEFAULT 'NOT_RECEIVED'")
-                raw_conn.commit()
+                db.execute(text("ALTER TABLE scholarship_credits ADD COLUMN status VARCHAR(20) DEFAULT 'NOT_RECEIVED'"))
                 db.commit()
+
+            if sc_info and "received_amount" not in sc_info:
+                print("Adding received_amount column to scholarship_credits table...")
+                db.execute(text("ALTER TABLE scholarship_credits ADD COLUMN received_amount NUMERIC(10, 2) DEFAULT 0.00"))
+                db.execute(text("UPDATE scholarship_credits SET received_amount = amount WHERE status = 'RECEIVED'"))
+                db.commit()
+
+            # Ensure scholarship_disbursements table exists
+            db.execute(text("""
+                CREATE TABLE IF NOT EXISTS scholarship_disbursements (
+                    id INTEGER PRIMARY KEY,
+                    scholarship_id INTEGER NOT NULL,
+                    amount NUMERIC(10, 2) NOT NULL,
+                    disbursement_date DATE NOT NULL,
+                    sanction_order_no VARCHAR(100),
+                    remarks VARCHAR(255),
+                    created_at DATETIME,
+                    FOREIGN KEY(scholarship_id) REFERENCES scholarship_credits (id) ON DELETE CASCADE
+                )
+            """))
+            db.execute(text("CREATE INDEX IF NOT EXISTS ix_scholarship_disbursements_sc_id ON scholarship_disbursements (scholarship_id)"))
+            db.commit()
 
             # If credit_date has NOT NULL constraint (1), recreate table to make it nullable
             if sc_info.get("credit_date") == 1:
                 print("Migrating scholarship_credits to make credit_date nullable...")
-                cursor.execute("PRAGMA foreign_keys=off")
-                cursor.execute("""
+                db.execute(text("PRAGMA foreign_keys=off"))
+                db.execute(text("""
                     CREATE TABLE scholarship_credits_new (
                         id INTEGER PRIMARY KEY,
                         student_id INTEGER NOT NULL,
@@ -130,23 +149,23 @@ def seed_database():
                         sanction_order_no VARCHAR(100),
                         credit_date DATE,
                         amount NUMERIC(10, 2) NOT NULL,
+                        received_amount NUMERIC(10, 2) DEFAULT 0.00,
                         status VARCHAR(20) DEFAULT 'NOT_RECEIVED',
                         remarks VARCHAR(255),
                         created_at DATETIME,
                         FOREIGN KEY(student_id) REFERENCES students (id) ON DELETE CASCADE,
                         FOREIGN KEY(fee_head_id) REFERENCES fee_heads (id) ON DELETE SET NULL
                     )
-                """)
-                cursor.execute("""
-                    INSERT INTO scholarship_credits_new (id, student_id, fee_head_id, scholarship_name, sanction_order_no, credit_date, amount, status, remarks, created_at)
-                    SELECT id, student_id, fee_head_id, scholarship_name, sanction_order_no, credit_date, amount, COALESCE(status, 'NOT_RECEIVED'), remarks, created_at FROM scholarship_credits
-                """)
-                cursor.execute("DROP TABLE scholarship_credits")
-                cursor.execute("ALTER TABLE scholarship_credits_new RENAME TO scholarship_credits")
-                cursor.execute("CREATE INDEX IF NOT EXISTS ix_scholarship_credits_student_id ON scholarship_credits (student_id)")
-                cursor.execute("CREATE INDEX IF NOT EXISTS ix_scholarship_credits_id ON scholarship_credits (id)")
-                cursor.execute("PRAGMA foreign_keys=on")
-                raw_conn.commit()
+                """))
+                db.execute(text("""
+                    INSERT INTO scholarship_credits_new (id, student_id, fee_head_id, scholarship_name, sanction_order_no, credit_date, amount, received_amount, status, remarks, created_at)
+                    SELECT id, student_id, fee_head_id, scholarship_name, sanction_order_no, credit_date, amount, COALESCE(received_amount, 0.00), COALESCE(status, 'NOT_RECEIVED'), remarks, created_at FROM scholarship_credits
+                """))
+                db.execute(text("DROP TABLE scholarship_credits"))
+                db.execute(text("ALTER TABLE scholarship_credits_new RENAME TO scholarship_credits"))
+                db.execute(text("CREATE INDEX IF NOT EXISTS ix_scholarship_credits_student_id ON scholarship_credits (student_id)"))
+                db.execute(text("CREATE INDEX IF NOT EXISTS ix_scholarship_credits_id ON scholarship_credits (id)"))
+                db.execute(text("PRAGMA foreign_keys=on"))
                 db.commit()
                 print("Migration of scholarship_credits completed.")
         except Exception as e:

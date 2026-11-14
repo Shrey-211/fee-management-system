@@ -48,6 +48,35 @@ class PaymentCreate(BaseModel):
             return None
         return v
 
+class PaymentUpdate(BaseModel):
+    physical_receipt_no: Optional[str] = None
+    payment_date: Optional[date] = None
+    entry_date: Optional[date] = None
+    payment_mode: Optional[str] = None
+    remarks: Optional[str] = None
+    items: Optional[List[PaymentItemCreate]] = None
+
+    @field_validator("physical_receipt_no", mode="before")
+    @classmethod
+    def coerce_empty_physical_receipt(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
+
+    @field_validator("payment_date", "entry_date", mode="before")
+    @classmethod
+    def coerce_empty_date(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
+
+    @field_validator("remarks", mode="before")
+    @classmethod
+    def coerce_empty_remarks(cls, v):
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
 class PaymentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
