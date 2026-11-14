@@ -140,8 +140,14 @@ def initialize_student_fees(student: Student, db: Session) -> List[StudentFeeHea
     """
     fee_heads = db.query(FeeHead).filter(FeeHead.academic_year == student.academic_year).all()
     if not fee_heads:
-        # Fallback to any active fee heads
-        fee_heads = db.query(FeeHead).all()
+        # Flexible match (e.g. 26-27 or 2026-2027) or fallback to active fee heads
+        clean_ay = (student.academic_year or "").replace("20", "").strip()
+        fee_heads = db.query(FeeHead).filter(
+            (FeeHead.academic_year.like(f"%{student.academic_year}%")) |
+            (FeeHead.academic_year.like(f"%{clean_ay}%"))
+        ).all()
+        if not fee_heads:
+            fee_heads = db.query(FeeHead).all()
 
     existing_sfh_map = {sfh.fee_head_id: sfh for sfh in student.fee_heads}
     result = []
@@ -266,7 +272,12 @@ def reapply_all_student_fee_rules(db: Session, academic_year: Optional[str] = No
     """
     query = db.query(Student).filter(Student.is_active == True)
     if academic_year:
-        query = query.filter(Student.academic_year == academic_year)
+        clean_ay = academic_year.replace("20", "").strip()
+        query = query.filter(
+            (Student.academic_year == academic_year.strip()) |
+            (Student.academic_year == clean_ay) |
+            (Student.academic_year.like(f"%{clean_ay}%"))
+        )
     students = query.all()
     for s in students:
         initialize_student_fees(s, db)

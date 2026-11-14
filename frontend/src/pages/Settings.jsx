@@ -425,6 +425,8 @@ export default function Settings({ user }) {
       await api.updateFeeHead(head.id, { base_amount: amt });
       setEditingHead(null);
       loadData();
+      setReapplyMsg(`Base fee for "${head.name}" updated to ₹${amt.toLocaleString('en-IN')}! All student fee ledgers synchronized.`);
+      setTimeout(() => setReapplyMsg(''), 6000);
     } catch (e) {
       setAlertModal({
         isOpen: true,

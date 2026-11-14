@@ -75,23 +75,24 @@ begin
   AdminPage.Values[1] := 'admin';
 end;
 
-function ShouldSkipPage(PageID: Integer): Boolean;
+procedure CurPageChanged(CurPageID: Integer);
 begin
-  Result := False;
-  // If upgrading existing system where database already exists in target folder, skip credential creation
-  if PageID = AdminPage.ID then
+  if CurPageID = AdminPage.ID then
   begin
     if FileExists(WizardDirValue + '\data\fees.db') then
     begin
-      IsUpgradeInstall := True;
-      Result := True;
+      AdminPage.Description := 'Existing database detected. Leave password blank to keep current administrator credentials, or enter new credentials to update.';
     end
     else
     begin
-      IsUpgradeInstall := False;
-      Result := False;
+      AdminPage.Description := 'Create the initial Administrator login credentials for Fee Management.';
     end;
   end;
+end;
+
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := False;
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
@@ -99,13 +100,23 @@ var
   uName: String;
   pWord: String;
   cWord: String;
+  DbExists: Boolean;
 begin
   Result := True;
   if CurPageID = AdminPage.ID then
   begin
+    DbExists := FileExists(WizardDirValue + '\data\fees.db');
     uName := Trim(AdminPage.Values[1]);
     pWord := AdminPage.Values[2];
     cWord := AdminPage.Values[3];
+
+    // If upgrading existing system where database exists and user leaves password blank, keep existing credentials
+    if DbExists and (pWord = '') and (cWord = '') then
+    begin
+      IsUpgradeInstall := True;
+      Result := True;
+      Exit;
+    end;
 
     if Trim(AdminPage.Values[0]) = '' then
     begin
@@ -134,6 +145,8 @@ begin
       Result := False;
       Exit;
     end;
+
+    IsUpgradeInstall := False;
   end;
 end;
 

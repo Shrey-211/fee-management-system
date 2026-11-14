@@ -133,25 +133,25 @@ def create_student(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    academic_year = (student_in.academic_year or "25-26").strip()
+    academic_year = (student_in.academic_year or settings.DEFAULT_ACADEMIC_YEAR).strip()
     clean_ay = academic_year.replace("/", "-")
+    course_branch = (student_in.course_branch or "MBA").strip()
+    course_prefix = course_branch.upper().replace(" ", "")[:4] or "MBA"
 
     # Handle roll number / student code: auto-generate if empty or whitespace
     if not student_in.student_code or not student_in.student_code.strip():
-        # Generate format: MBA-{AY}-{0001}
+        # Generate format: {COURSE}-{AY}-{0001}
         count = db.query(Student).filter(Student.academic_year == academic_year).count() + 1
-        generated_code = f"MBA-{clean_ay}-{count:04d}"
+        generated_code = f"{course_prefix}-{clean_ay}-{count:04d}"
         while db.query(Student).filter(Student.student_code == generated_code).first():
             count += 1
-            generated_code = f"MBA-{clean_ay}-{count:04d}"
+            generated_code = f"{course_prefix}-{clean_ay}-{count:04d}"
         student_code = generated_code
     else:
         student_code = student_in.student_code.strip().upper()
         existing = db.query(Student).filter(Student.student_code == student_code).first()
         if existing:
             raise HTTPException(status_code=400, detail="Student Code / Roll Number already exists")
-
-    course_branch = (student_in.course_branch or "MBA").strip()
 
     student = Student(
         student_code=student_code,
@@ -376,8 +376,10 @@ def update_student(
         student.email_address = student_in.email_address.strip()
     if student_in.address is not None:
         student.address = student_in.address
-    if student_in.academic_year is not None:
+    academic_year_changed = False
+    if student_in.academic_year is not None and student_in.academic_year.strip() != student.academic_year:
         student.academic_year = student_in.academic_year.strip()
+        academic_year_changed = True
     if student_in.course_branch is not None:
         student.course_branch = student_in.course_branch
     if student_in.current_year is not None:
@@ -385,7 +387,7 @@ def update_student(
     if student_in.is_active is not None:
         student.is_active = student_in.is_active
 
-    if category_or_gender_changed:
+    if category_or_gender_changed or academic_year_changed:
         # Re-apply waiver logic and update student fee heads
         initialize_student_fees(student, db)
 

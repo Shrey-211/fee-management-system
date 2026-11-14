@@ -225,7 +225,15 @@ def export_daily_collection_excel(db: Session, start_date: date, end_date: date)
 
 
 def export_outstanding_dues_excel(db: Session, academic_year: Optional[str] = None) -> io.BytesIO:
-    students = db.query(Student).filter(Student.is_active == True).all()
+    query = db.query(Student).filter(Student.is_active == True)
+    if academic_year:
+        clean_ay = academic_year.replace("20", "").strip()
+        query = query.filter(
+            (Student.academic_year == academic_year.strip()) |
+            (Student.academic_year == clean_ay) |
+            (Student.academic_year.like(f"%{clean_ay}%"))
+        )
+    students = query.order_by(Student.full_name.asc()).all()
     wb = Workbook()
     ws = wb.active
     ws.title = "Outstanding Fee Balances"

@@ -80,6 +80,8 @@ def update_fee_head(
         head.name = head_in.name.strip()
     if head_in.base_amount is not None:
         head.base_amount = quantize_amount(head_in.base_amount)
+        # Automatically synchronize all enrolled students' fee heads with the updated base amount
+        reapply_all_student_fee_rules(db, academic_year=head.academic_year)
     if head_in.academic_year is not None:
         head.academic_year = head_in.academic_year
     if head_in.is_compulsory is not None:

@@ -74,7 +74,7 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
     if (!student) return;
     setEditForm({
       full_name: student.full_name,
-      academic_year: student.academic_year || '25-26',
+      academic_year: student.academic_year || '2026-2027',
       gender: student.gender,
       category: student.category,
       concession_type_id: student.concession_type_id || '',
@@ -101,7 +101,7 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
     const payload = {
       ...editForm,
       full_name: trimmedName,
-      academic_year: (editForm.academic_year || '25-26').trim(),
+      academic_year: (editForm.academic_year || '2026-2027').trim(),
       concession_type_id: editForm.concession_type_id ? parseInt(editForm.concession_type_id) : null,
       mobile_number: (editForm.mobile_number || '').trim() || null,
       email_address: (editForm.email_address || '').trim() || null,
@@ -417,7 +417,7 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              Program: <strong>{student.course_branch || 'MBA'}</strong> | Academic Session: <strong>{student.academic_year || '25-26'}</strong>
+              Program: <strong>{student.course_branch || 'MBA'}</strong> | Academic Session: <strong>{student.academic_year || '2026-2027'}</strong>
             </p>
           </div>
 
@@ -873,11 +873,11 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Academic Year * (e.g. 25-26)</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Academic Year * (e.g. 2026-2027)</label>
                   <input
                     type="text"
                     required
-                    value={editForm.academic_year || '25-26'}
+                    value={editForm.academic_year || '2026-2027'}
                     onChange={(e) => setEditForm({ ...editForm, academic_year: e.target.value })}
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 font-medium"
                   />

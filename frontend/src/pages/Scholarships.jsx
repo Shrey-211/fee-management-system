@@ -437,11 +437,11 @@ export default function Scholarships() {
                     <tr key={s.id} className="hover:bg-slate-50/80 transition">
                       <td className="px-4 py-3">
                         <div className="font-bold text-slate-900">{s.student_name}</div>
-                        <div className="text-[11px] text-slate-400 font-normal">MBA Program</div>
+                        <div className="text-[11px] text-slate-400 font-normal">{s.course_branch || s.student_course || 'MBA'} Program</div>
                       </td>
                       <td className="px-4 py-3 font-semibold text-slate-700">
                         <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
-                          {s.academic_year || '25-26'}
+                          {s.academic_year || '2026-2027'}
                         </span>
                       </td>
                       <td className="px-4 py-3">

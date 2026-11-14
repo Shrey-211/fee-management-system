@@ -60,7 +60,7 @@ export default function Reports({ onSelectStudent }) {
   };
 
   const handleDownloadOutstandingExcel = () => {
-    api.downloadOutstandingExcel('2026-2027');
+    api.downloadOutstandingExcel();
   };
 
   const filteredDailyItems = (dailyData?.items || []).filter((item) => {
@@ -181,8 +181,9 @@ export default function Reports({ onSelectStudent }) {
                 </button>
                 <button
                   onClick={() => {
-                    setStartDate('2026-07-01');
-                    setEndDate('2026-10-31');
+                    const y = new Date().getFullYear();
+                    setStartDate(`${y}-07-01`);
+                    setEndDate(`${y}-10-31`);
                   }}
                   className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium rounded border"
                 >

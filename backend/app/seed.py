@@ -9,6 +9,7 @@ from .models import (
     FeeConcessionType, FeeTypeHeadRule
 )
 from .auth import get_password_hash
+from .config import settings
 from .services.fee_engine import initialize_student_fees, quantize_amount
 from .services.email_service import DEFAULT_TEMPLATE_SUBJECT, DEFAULT_TEMPLATE_BODY
 
@@ -29,6 +30,11 @@ def seed_database(seed_samples: bool = False):
                 p_word = admin_data.get("password", "").strip()
                 f_name = admin_data.get("full_name", "College Administrator").strip()
                 if u_name and p_word:
+                    # Clean up legacy default dummy accounts if present
+                    db.query(User).filter(User.username.in_(["accountant", "clerk"])).delete(synchronize_session=False)
+                    if u_name != "admin":
+                        db.query(User).filter(User.username == "admin").delete(synchronize_session=False)
+
                     existing_user = db.query(User).filter(User.username == u_name).first()
                     if existing_user:
                         existing_user.password_hash = get_password_hash(p_word)
@@ -45,15 +51,25 @@ def seed_database(seed_samples: bool = False):
                         )
                         db.add(admin_user)
                     db.commit()
-                    print(f"Master administrator account '{u_name}' initialized successfully.")
+                    print(f"Master administrator account '{u_name}' configured successfully.")
             except Exception as e:
-                print(f"Error initializing master administrator: {e}")
+                print(f"Error configuring master administrator: {e}")
             finally:
                 # Always remove initial_admin.json immediately so plaintext credentials never persist on disk
                 try:
                     admin_init_file.unlink(missing_ok=True)
                 except Exception:
                     pass
+
+        # Clean up any legacy test sports categories if present in existing databases
+        legacy_sports = db.query(FeeConcessionType).filter(
+            (FeeConcessionType.code.like("SPORTS%")) | (FeeConcessionType.name.like("%Sports%"))
+        ).all()
+        if legacy_sports:
+            for s in legacy_sports:
+                db.query(FeeTypeHeadRule).filter(FeeTypeHeadRule.concession_type_id == s.id).delete(synchronize_session=False)
+                db.delete(s)
+            db.commit()
 
         # 2. Seed Fee Heads
         if db.query(FeeHead).count() == 0:

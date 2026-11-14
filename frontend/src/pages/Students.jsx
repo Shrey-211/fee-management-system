@@ -16,11 +16,12 @@ export default function Students({ onSelectStudent }) {
   const [hasDuesOnly, setHasDuesOnly] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [feeTypes, setFeeTypes] = useState([]);
+  const [feeHeads, setFeeHeads] = useState([]);
 
-  // New Student Form State (Roll number removed, Academic Year added with default '25-26', Course default MBA)
+  // New Student Form State (Roll number removed, Academic Year added with default '2026-2027', Course default MBA)
   const [formData, setFormData] = useState({
     full_name: '',
-    academic_year: '25-26',
+    academic_year: '2026-2027',
     dob: '',
     gender: 'MALE',
     category: 'OPEN',
@@ -35,10 +36,24 @@ export default function Students({ onSelectStudent }) {
   const [formError, setFormError] = useState('');
 
   useEffect(() => {
-    api.getFeeTypes()
+    api.getFeeTypes('2026-2027')
       .then(types => setFeeTypes(types || []))
       .catch(() => {});
+    api.getFeeHeads('2026-2027')
+      .then(heads => setFeeHeads(heads || []))
+      .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (showAddModal) {
+      api.getFeeHeads(formData.academic_year || '2026-2027')
+        .then(heads => setFeeHeads(heads || []))
+        .catch(() => {});
+      api.getFeeTypes(formData.academic_year || '2026-2027')
+        .then(types => setFeeTypes(types || []))
+        .catch(() => {});
+    }
+  }, [showAddModal, formData.academic_year]);
 
   const loadStudents = async () => {
     setLoading(true);
@@ -72,14 +87,14 @@ export default function Students({ onSelectStudent }) {
     setFormError('');
 
     const trimmedName = (formData.full_name || '').trim();
-    const trimmedAY = (formData.academic_year || '25-26').trim();
+    const trimmedAY = (formData.academic_year || '2026-2027').trim();
 
     if (!trimmedName) {
       setFormError('Full Student Name (*) is required. Please fill in this field.');
       return;
     }
     if (!trimmedAY) {
-      setFormError('Academic Year (*) is required (e.g. 25-26).');
+      setFormError('Academic Year (*) is required (e.g. 2026-2027).');
       return;
     }
 
@@ -104,7 +119,7 @@ export default function Students({ onSelectStudent }) {
       setShowAddModal(false);
       setFormData({
         full_name: '',
-        academic_year: '25-26',
+        academic_year: '2026-2027',
         dob: '',
         gender: 'MALE',
         category: 'OPEN',
@@ -124,35 +139,105 @@ export default function Students({ onSelectStudent }) {
     }
   };
 
-  // Waiver Preview Calculation for the Form
+  // Dynamic Fee & Waiver Preview Calculation based on configured Fee Heads & Rules
   const getWaiverPreview = () => {
     const isGirl = formData.gender === 'FEMALE';
-    const isSCST = ['SC', 'ST'].includes(formData.category);
-    const isEBC = formData.category === 'EBC';
+    const cat = (formData.category || 'OPEN').toUpperCase().trim();
+    const isSCST = ['SC', 'ST'].includes(cat);
+    const isEBC = cat === 'EBC';
+    const concessionId = formData.concession_type_id ? parseInt(formData.concession_type_id) : null;
 
-    let tuitionStatus = '100% Payable (₹40,000)';
-    let devStatus = '100% Payable (₹15,000)';
+    // Find configured fee heads
+    const tuitionHead = feeHeads.find(h => (h.code || '').toUpperCase() === 'TUITION' || (h.name || '').toLowerCase().includes('tuition'));
+    const devHead = feeHeads.find(h => (h.code || '').toUpperCase() === 'DEVELOPMENT' || (h.name || '').toLowerCase().includes('development'));
 
-    if (isSCST) {
-      tuitionStatus = '100% Govt Scholarship (Govt: ₹40,000 - Not Received)';
-      devStatus = '100% Govt Scholarship (Govt: ₹15,000 - Not Received)';
-    } else if (isGirl) {
-      tuitionStatus = '100% Govt Scheme (Govt: ₹40,000 - Not Received)';
-      devStatus = '100% Payable (₹15,000)';
-    } else if (isEBC) {
-      tuitionStatus = '50% Govt Scholarship (Govt: ₹20,000 - Not Received)';
-      devStatus = '100% Payable (₹15,000)';
+    const tuitionBase = tuitionHead ? Number(tuitionHead.base_amount) : 0;
+    const devBase = devHead ? Number(devHead.base_amount) : 0;
+
+    // Other compulsory heads
+    const otherHeads = feeHeads.filter(h => h.id !== tuitionHead?.id && h.id !== devHead?.id);
+    const otherCompulsory = otherHeads.reduce((sum, h) => sum + Number(h.base_amount || 0), 0);
+    const totalBase = feeHeads.reduce((sum, h) => sum + Number(h.base_amount || 0), 0);
+
+    const selectedType = concessionId ? feeTypes.find(t => t.id === concessionId) : null;
+
+    let tuitionWaiverPct = 0;
+    let devWaiverPct = 0;
+    let tuitionReason = '';
+    let devReason = '';
+
+    // Check custom concession rules first
+    if (selectedType && selectedType.rules) {
+      if (tuitionHead) {
+        const r = selectedType.rules.find(x => x.fee_head_id === tuitionHead.id);
+        if (r && Number(r.waiver_percent) > 0) {
+          tuitionWaiverPct = Number(r.waiver_percent);
+          tuitionReason = r.reason || selectedType.name;
+        }
+      }
+      if (devHead) {
+        const r = selectedType.rules.find(x => x.fee_head_id === devHead.id);
+        if (r && Number(r.waiver_percent) > 0) {
+          devWaiverPct = Number(r.waiver_percent);
+          devReason = r.reason || selectedType.name;
+        }
+      }
     }
 
-    return { tuitionStatus, devStatus };
+    // Standard category/gender institutional & government scholarship rules
+    if (tuitionWaiverPct === 0) {
+      if (isSCST) {
+        tuitionWaiverPct = 100;
+        tuitionReason = `${cat} Govt Scholarship`;
+      } else if (isGirl) {
+        tuitionWaiverPct = 100;
+        tuitionReason = 'Girl Student Scheme';
+      } else if (isEBC) {
+        tuitionWaiverPct = 50;
+        tuitionReason = 'EBC Govt Scholarship';
+      }
+    }
+
+    if (devWaiverPct === 0) {
+      if (isSCST) {
+        devWaiverPct = 100;
+        devReason = `${cat} Govt Scholarship`;
+      }
+    }
+
+    const fmt = (val) => '₹' + Number(val).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+
+    let tuitionStatus = '';
+    if (tuitionWaiverPct === 100) {
+      tuitionStatus = `100% Waived (${tuitionReason}: ${fmt(tuitionBase)} - Not Received)`;
+    } else if (tuitionWaiverPct > 0) {
+      const waivedAmt = (tuitionBase * tuitionWaiverPct) / 100;
+      const netPayable = tuitionBase - waivedAmt;
+      tuitionStatus = `${tuitionWaiverPct}% Waived (${fmt(waivedAmt)} Govt / ${fmt(netPayable)} Payable)`;
+    } else {
+      tuitionStatus = `100% Payable (${fmt(tuitionBase)})`;
+    }
+
+    let devStatus = '';
+    if (devWaiverPct === 100) {
+      devStatus = `100% Waived (${devReason}: ${fmt(devBase)} - Not Received)`;
+    } else if (devWaiverPct > 0) {
+      const waivedAmt = (devBase * devWaiverPct) / 100;
+      const netPayable = devBase - waivedAmt;
+      devStatus = `${devWaiverPct}% Waived (${fmt(waivedAmt)} Govt / ${fmt(netPayable)} Payable)`;
+    } else {
+      devStatus = `100% Payable (${fmt(devBase)})`;
+    }
+
+    return { tuitionStatus, devStatus, tuitionBase, devBase, otherCompulsory, totalBase };
   };
 
   const preview = getWaiverPreview();
 
   // Extract unique academic years from loaded students for easy filter selection
   const availableAcademicYears = Array.from(new Set(students.map(s => s.academic_year).filter(Boolean)));
-  if (!availableAcademicYears.includes('25-26')) {
-    availableAcademicYears.unshift('25-26');
+  if (!availableAcademicYears.includes('2026-2027')) {
+    availableAcademicYears.unshift('2026-2027');
   }
 
   return (
@@ -278,11 +363,11 @@ export default function Students({ onSelectStudent }) {
                   >
                     <td className="px-4 py-3">
                       <div className="font-bold text-slate-900">{s.full_name}</div>
-                      <div className="text-[11px] text-slate-400 font-normal">MBA Program</div>
+                      <div className="text-[11px] text-slate-400 font-normal">{s.course_branch || 'MBA'} Program</div>
                     </td>
                     <td className="px-4 py-3 font-semibold text-slate-700">
                       <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
-                        {s.academic_year || '25-26'}
+                        {s.academic_year || '2026-2027'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-slate-600">{s.gender}</td>
@@ -399,11 +484,11 @@ export default function Students({ onSelectStudent }) {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Academic Year * (e.g. 25-26)</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Academic Year * (e.g. 2026-2027)</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. 25-26"
+                    placeholder="e.g. 2026-2027"
                     value={formData.academic_year}
                     onChange={(e) => setFormData({ ...formData, academic_year: e.target.value })}
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none font-medium"
@@ -529,14 +614,26 @@ export default function Students({ onSelectStudent }) {
               </div>
 
               {/* Automatic Fee Waiver Live Preview */}
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl space-y-1">
-                <p className="font-bold text-blue-900 flex items-center gap-1">
-                  <span>⚡ Automatic Fee Waiver & Govt Scholarship Assessment:</span>
-                </p>
-                <div className="grid grid-cols-2 gap-2 text-slate-700">
-                  <div>Tuition: <span className="font-semibold text-blue-800">{preview.tuitionStatus}</span></div>
-                  <div>Development: <span className="font-semibold text-blue-800">{preview.devStatus}</span></div>
+              <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-blue-900 flex items-center gap-1 text-sm">
+                    ⚡ Automatic Fee Waiver & Govt Scholarship Assessment:
+                  </span>
+                  {preview.totalBase > 0 && (
+                    <span className="text-[11px] font-semibold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full border border-blue-200">
+                      Total Base Fees: ₹{preview.totalBase.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                    </span>
+                  )}
                 </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-slate-700 bg-white/80 p-2.5 rounded-lg border border-blue-100">
+                  <div>Tuition Fee: <span className="font-semibold text-blue-800">{preview.tuitionStatus}</span></div>
+                  <div>Development Fee: <span className="font-semibold text-blue-800">{preview.devStatus}</span></div>
+                </div>
+                {preview.otherCompulsory > 0 && (
+                  <div className="text-[11px] text-slate-600">
+                    + Compulsory Non-Waiver Fees (Dress, Exam, etc.): <strong className="text-slate-800">₹{preview.otherCompulsory.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</strong>
+                  </div>
+                )}
                 <p className="text-[10px] text-blue-600 mt-1 italic">
                   Note: All category discounts will be tracked under the Scholarships section with status "Not Received" until funds are disbursed by the government.
                 </p>
