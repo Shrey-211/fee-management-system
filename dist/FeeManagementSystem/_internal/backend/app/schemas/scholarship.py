@@ -67,6 +67,8 @@ class MarkScholarshipReceivedRequest(BaseModel):
 class ScholarshipDisbursementResponse(BaseModel):
     id: int
     scholarship_id: int
+    payment_id: Optional[int] = None
+    receipt_no: Optional[str] = None
     amount: Decimal
     disbursement_date: date
     sanction_order_no: Optional[str] = None

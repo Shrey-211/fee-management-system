@@ -12,7 +12,7 @@ from .auth import get_password_hash
 from .services.fee_engine import initialize_student_fees, quantize_amount
 from .services.email_service import DEFAULT_TEMPLATE_SUBJECT, DEFAULT_TEMPLATE_BODY
 
-def seed_database():
+def seed_database(seed_samples: bool = False):
     print("Creating database tables...")
     Base.metadata.create_all(bind=engine)
     db: Session = SessionLocal()
@@ -120,20 +120,26 @@ def seed_database():
                 db.execute(text("UPDATE scholarship_credits SET received_amount = amount WHERE status = 'RECEIVED'"))
                 db.commit()
 
-            # Ensure scholarship_disbursements table exists
+            # Ensure scholarship_disbursements table exists and has payment_id
             db.execute(text("""
                 CREATE TABLE IF NOT EXISTS scholarship_disbursements (
                     id INTEGER PRIMARY KEY,
                     scholarship_id INTEGER NOT NULL,
+                    payment_id INTEGER,
                     amount NUMERIC(10, 2) NOT NULL,
                     disbursement_date DATE NOT NULL,
                     sanction_order_no VARCHAR(100),
                     remarks VARCHAR(255),
                     created_at DATETIME,
-                    FOREIGN KEY(scholarship_id) REFERENCES scholarship_credits (id) ON DELETE CASCADE
+                    FOREIGN KEY(scholarship_id) REFERENCES scholarship_credits (id) ON DELETE CASCADE,
+                    FOREIGN KEY(payment_id) REFERENCES payments (id) ON DELETE SET NULL
                 )
             """))
             db.execute(text("CREATE INDEX IF NOT EXISTS ix_scholarship_disbursements_sc_id ON scholarship_disbursements (scholarship_id)"))
+            
+            disb_cols = [r[1] for r in db.execute(text("PRAGMA table_info(scholarship_disbursements)")).fetchall()]
+            if disb_cols and "payment_id" not in disb_cols:
+                db.execute(text("ALTER TABLE scholarship_disbursements ADD COLUMN payment_id INTEGER REFERENCES payments(id)"))
             db.commit()
 
             # If credit_date has NOT NULL constraint (1), recreate table to make it nullable
@@ -320,8 +326,8 @@ def seed_database():
             db.add(template)
             db.commit()
 
-        # 4. Seed Sample Students with Waiver Scenarios
-        if db.query(Student).count() == 0:
+        # 4. Seed Sample Students with Waiver Scenarios (Disabled by default so database stays clean)
+        if seed_samples and db.query(Student).count() == 0:
             print("Seeding representative student profiles...")
             sample_students = [
                 Student(
@@ -433,5 +439,6 @@ def seed_database():
         db.close()
 
 if __name__ == "__main__":
-    seed_database()
+    import sys
+    seed_database(seed_samples="--samples" in sys.argv)
 

@@ -30,6 +30,7 @@ class ScholarshipDisbursement(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     scholarship_id = Column(Integer, ForeignKey("scholarship_credits.id", ondelete="CASCADE"), nullable=False, index=True)
+    payment_id = Column(Integer, ForeignKey("payments.id", ondelete="SET NULL"), nullable=True, index=True)
     amount = Column(Numeric(10, 2), nullable=False)
     disbursement_date = Column(SqlDate, nullable=False, default=date.today)
     sanction_order_no = Column(String(100), nullable=True)
@@ -38,5 +39,6 @@ class ScholarshipDisbursement(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     scholarship = relationship("ScholarshipCredit", back_populates="disbursements")
+    payment = relationship("Payment")
 
 

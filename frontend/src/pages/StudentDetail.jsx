@@ -14,6 +14,8 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
 
   // Waive Dialog & Alert States
   const [waiveDialog, setWaiveDialog] = useState({ isOpen: false, fine: null, loading: false });
+  const [deletePaymentDialog, setDeletePaymentDialog] = useState({ isOpen: false, payment: null, loading: false });
+  const [resetScholarshipDialog, setResetScholarshipDialog] = useState({ isOpen: false, scId: null, loading: false });
   const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '', type: 'info' });
 
   // Edit Profile Modal
@@ -191,13 +193,25 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
     }
   };
 
-  const handleMarkScholarshipPending = async (scId) => {
-    if (!window.confirm("Reset all recorded disbursements for this scholarship back to NOT RECEIVED?")) return;
+  const handleOpenResetScholarship = (scId) => {
+    setResetScholarshipDialog({ isOpen: true, scId, loading: false });
+  };
+
+  const handleConfirmResetScholarship = async () => {
+    if (!resetScholarshipDialog.scId) return;
+    setResetScholarshipDialog(prev => ({ ...prev, loading: true }));
     try {
-      await api.markScholarshipPending(scId);
+      await api.markScholarshipPending(resetScholarshipDialog.scId);
+      setResetScholarshipDialog({ isOpen: false, scId: null, loading: false });
       loadStudent();
     } catch (err) {
-      alert(err.message || "Failed to update scholarship status.");
+      setResetScholarshipDialog({ isOpen: false, scId: null, loading: false });
+      setAlertModal({
+        isOpen: true,
+        type: 'danger',
+        title: 'Reset Failed',
+        message: err.message || 'Failed to update scholarship status.'
+      });
     }
   };
 
@@ -268,15 +282,25 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
     }
   };
 
-  const handleDeletePayment = async (p) => {
-    const confirmMsg = `Are you sure you want to delete payment receipt ${p.internal_receipt_no} for ₹${Number(p.total_amount).toLocaleString('en-IN')}?\n\nThis will restore the student's pending balance in the ledger.`;
-    if (!window.confirm(confirmMsg)) return;
+  const handleOpenDeletePayment = (p) => {
+    setDeletePaymentDialog({ isOpen: true, payment: p, loading: false });
+  };
 
+  const handleConfirmDeletePayment = async () => {
+    if (!deletePaymentDialog.payment) return;
+    setDeletePaymentDialog(prev => ({ ...prev, loading: true }));
     try {
-      await api.deletePayment(p.id);
+      await api.deletePayment(deletePaymentDialog.payment.id);
+      setDeletePaymentDialog({ isOpen: false, payment: null, loading: false });
       loadStudent();
     } catch (err) {
-      alert(err.message || 'Failed to delete payment receipt.');
+      setDeletePaymentDialog({ isOpen: false, payment: null, loading: false });
+      setAlertModal({
+        isOpen: true,
+        type: 'danger',
+        title: 'Delete Failed',
+        message: err.message || 'Failed to delete payment receipt.'
+      });
     }
   };
 
@@ -601,7 +625,7 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
                           )}
                           {rec > 0.001 && (
                             <button
-                              onClick={() => handleMarkScholarshipPending(sc.id)}
+                              onClick={() => handleOpenResetScholarship(sc.id)}
                               className="text-slate-400 hover:text-amber-600 text-[11px] transition"
                               title="Reset all recorded steps for this scholarship"
                             >
@@ -742,9 +766,15 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
                     <td className="px-4 py-3 font-mono font-bold text-slate-900">{p.physical_receipt_no || '—'}</td>
                     <td className="px-4 py-3 font-mono text-slate-400">{p.internal_receipt_no}</td>
                     <td className="px-4 py-3">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
-                        {p.payment_mode}
-                      </span>
+                      {p.payment_mode === 'GOVT_SCHOLARSHIP' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs">
+                          <Award className="w-3 h-3 text-emerald-600" /> Govt Scholarship (DBT)
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
+                          {p.payment_mode}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-slate-600">
                       <div className="space-y-0.5">
@@ -768,7 +798,7 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={() => handleDeletePayment(p)}
+                          onClick={() => handleOpenDeletePayment(p)}
                           className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded transition"
                           title="Delete Receipt & Restore Dues"
                         >
@@ -1301,6 +1331,45 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
           </div>
         </div>
       )}
+
+      {/* Styled Delete Payment Confirmation Modal */}
+      <ModalDialog
+        isOpen={deletePaymentDialog.isOpen}
+        type="danger"
+        title="Delete Payment Receipt"
+        message={`Are you sure you want to permanently delete payment receipt ${deletePaymentDialog.payment?.internal_receipt_no || ''} for ₹${Number(deletePaymentDialog.payment?.total_amount || 0).toLocaleString('en-IN')}? This will restore the student's pending balance in the ledger.`}
+        confirmText="Yes, Delete Receipt"
+        cancelText="Cancel"
+        confirmVariant="danger"
+        loading={deletePaymentDialog.loading}
+        onConfirm={handleConfirmDeletePayment}
+        onClose={() => setDeletePaymentDialog({ isOpen: false, payment: null, loading: false })}
+      />
+
+      {/* Styled Reset Scholarship Confirmation Modal */}
+      <ModalDialog
+        isOpen={resetScholarshipDialog.isOpen}
+        type="warning"
+        title="Reset Government Scholarship"
+        message="Are you sure you want to reset all recorded disbursements for this scholarship back to NOT RECEIVED? Any generated scholarship receipts will also be deleted."
+        confirmText="Yes, Reset to Not Received"
+        cancelText="Cancel"
+        confirmVariant="warning"
+        loading={resetScholarshipDialog.loading}
+        onConfirm={handleConfirmResetScholarship}
+        onClose={() => setResetScholarshipDialog({ isOpen: false, scId: null, loading: false })}
+      />
+
+      {/* Generic Alert Modal */}
+      <ModalDialog
+        isOpen={alertModal.isOpen}
+        type={alertModal.type || 'info'}
+        title={alertModal.title}
+        message={alertModal.message}
+        confirmText="OK"
+        onConfirm={() => setAlertModal({ isOpen: false, title: '', message: '', type: 'info' })}
+        onClose={() => setAlertModal({ isOpen: false, title: '', message: '', type: 'info' })}
+      />
     </div>
   );
 }

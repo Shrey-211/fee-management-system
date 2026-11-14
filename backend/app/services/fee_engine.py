@@ -230,17 +230,10 @@ def recalculate_student_balances(student_id: int, db: Session):
     for sfh in student.fee_heads:
         paid_from_payments = db.query(PaymentItem).join(Payment).filter(
             Payment.student_id == student_id,
-            PaymentItem.fee_head_id == sfh.fee_head_id
+            PaymentItem.fee_head_id == sfh.fee_head_id,
+            Payment.payment_mode != "GOVT_SCHOLARSHIP"
         ).all()
         total_paid_head = sum([quantize_amount(item.amount) for item in paid_from_payments], Decimal("0.00"))
-
-        # Also credit scholarships allocated to this fee head that have been marked as RECEIVED
-        scholarship_credits = db.query(ScholarshipCredit).filter(
-            ScholarshipCredit.student_id == student_id,
-            ScholarshipCredit.fee_head_id == sfh.fee_head_id,
-            ScholarshipCredit.status == "RECEIVED"
-        ).all()
-        total_scholarship = sum([quantize_amount(sc.amount) for sc in scholarship_credits], Decimal("0.00"))
 
         sfh.paid_amount = quantize_amount(total_paid_head)
         sfh.balance = quantize_amount(sfh.net_due - sfh.paid_amount)

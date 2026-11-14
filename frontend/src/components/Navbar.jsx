@@ -18,9 +18,6 @@ export default function Navbar({ user, onLogout, onChangePasswordClick }) {
           <div>
             <h1 className="text-base font-bold tracking-tight text-white flex items-center gap-2">
               Student Fee Management System
-              <span className="text-xs font-medium px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                <WifiOff className="w-3 h-3 inline" /> Offline Mode
-              </span>
             </h1>
             <p className="text-xs text-slate-400">Designated PC Office Installation (Mr. Shrikant's PC)</p>
           </div>

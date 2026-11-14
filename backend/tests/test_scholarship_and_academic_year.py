@@ -126,7 +126,17 @@ def test_partial_installment_disbursements_lifecycle():
     assert Decimal(str(sc_data["remaining_amount"])) == total_claim - Decimal("15000.00")
     assert len(sc_data["disbursements"]) == 1
     assert Decimal(str(sc_data["disbursements"][0]["amount"])) == Decimal("15000.00")
-    disb_1_id = sc_data["disbursements"][0]["id"]
+    disb_1 = sc_data["disbursements"][0]
+    disb_1_id = disb_1["id"]
+    disb_1_payment_id = disb_1.get("payment_id")
+    assert disb_1_payment_id is not None
+    assert disb_1.get("receipt_no") is not None
+
+    # Verify Payment receipt exists with mode GOVT_SCHOLARSHIP
+    pmt_res = client.get(f"/api/payments?payment_mode=GOVT_SCHOLARSHIP", headers=headers)
+    assert pmt_res.status_code == 200
+    pmts = pmt_res.json()
+    assert any(p["id"] == disb_1_payment_id for p in pmts)
 
     # 4. Verify Student Profile & Directory reflect partial step
     student_detail = client.get(f"/api/students/{student_id}", headers=headers).json()
@@ -164,5 +174,10 @@ def test_partial_installment_disbursements_lifecycle():
     assert Decimal(str(after_del["received_amount"])) == total_claim - Decimal("15000.00")
     assert after_del["status"] == "PARTIALLY_RECEIVED"
     assert len(after_del["disbursements"]) == 1
+
+    # Verify associated payment receipt was automatically cleaned up
+    pmt_after_res = client.get(f"/api/payments?payment_mode=GOVT_SCHOLARSHIP", headers=headers)
+    assert pmt_after_res.status_code == 200
+    assert not any(p["id"] == disb_1_payment_id for p in pmt_after_res.json())
 
 

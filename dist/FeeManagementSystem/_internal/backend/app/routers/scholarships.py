@@ -39,6 +39,8 @@ def serialize_scholarship(sc: ScholarshipCredit) -> dict:
         disb_list.append({
             "id": d.id,
             "scholarship_id": d.scholarship_id,
+            "payment_id": getattr(d, 'payment_id', None),
+            "receipt_no": d.payment.internal_receipt_no if getattr(d, 'payment', None) else None,
             "amount": quantize_amount(d.amount),
             "disbursement_date": d.disbursement_date,
             "sanction_order_no": d.sanction_order_no,
@@ -216,8 +218,41 @@ def mark_scholarship_received(
     disb_date = req.credit_date or date.today()
     sanction_no = req.sanction_order_no.strip() if req.sanction_order_no else sc.sanction_order_no
 
+    # Automatically generate an official payment receipt for this government disbursement
+    from ..models.payment import Payment, PaymentItem
+    from ..services.payment_service import generate_internal_receipt_no
+
+    student = sc.student
+    ay = (student.academic_year if student else "25-26") or "25-26"
+    internal_receipt = generate_internal_receipt_no(db, ay)
+    phys_receipt = sanction_no or f"DBT-{disb_date.strftime('%Y%m%d')}"
+
+    payment = Payment(
+        internal_receipt_no=internal_receipt,
+        physical_receipt_no=phys_receipt,
+        student_id=sc.student_id,
+        payment_date=disb_date,
+        entry_date=date.today(),
+        payment_mode="GOVT_SCHOLARSHIP",
+        total_amount=inst_amount,
+        recorded_by_id=current_user.id if current_user else None,
+        remarks=f"Govt Scholarship DBT: {sc.scholarship_name}" + (f" - {req.remarks}" if req.remarks else "")
+    )
+    db.add(payment)
+    db.flush()
+
+    p_item = PaymentItem(
+        payment_id=payment.id,
+        fee_head_id=sc.fee_head_id,
+        fine_id=None,
+        amount=inst_amount
+    )
+    db.add(p_item)
+    db.flush()
+
     disb = ScholarshipDisbursement(
         scholarship_id=sc.id,
+        payment_id=payment.id,
         amount=inst_amount,
         disbursement_date=disb_date,
         sanction_order_no=sanction_no,
@@ -276,6 +311,14 @@ def mark_scholarship_pending(
     sc.credit_date = None
     sc.remarks = "Not Received"
 
+    from ..models.payment import Payment
+    disbs = db.query(ScholarshipDisbursement).filter(ScholarshipDisbursement.scholarship_id == sc.id).all()
+    for d in disbs:
+        if d.payment_id:
+            linked_payment = db.query(Payment).filter(Payment.id == d.payment_id).first()
+            if linked_payment:
+                db.delete(linked_payment)
+
     db.query(ScholarshipDisbursement).filter(ScholarshipDisbursement.scholarship_id == sc.id).delete()
 
     log_audit(
@@ -313,6 +356,12 @@ def delete_scholarship_disbursement(
         raise HTTPException(status_code=404, detail="Disbursement entry not found")
 
     removed_amt = quantize_amount(disb.amount)
+    if disb.payment_id:
+        from ..models.payment import Payment
+        linked_payment = db.query(Payment).filter(Payment.id == disb.payment_id).first()
+        if linked_payment:
+            db.delete(linked_payment)
+
     db.delete(disb)
     db.flush()
 

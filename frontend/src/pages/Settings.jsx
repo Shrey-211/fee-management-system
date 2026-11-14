@@ -126,6 +126,7 @@ export default function Settings({ user }) {
       rulesMap[h.id] = {
         waiver_percent: '0',
         waiver_amount: '0',
+        applicable_fee: String(h.base_amount),
         reason: ''
       };
     });
@@ -144,14 +145,116 @@ export default function Settings({ user }) {
     const rulesMap = {};
     feeHeads.forEach(h => {
       const existingRule = (type.rules || []).find(r => r.fee_head_id === h.id);
+      const baseAmt = Number(h.base_amount);
+      const pct = existingRule ? Number(existingRule.waiver_percent || 0) : 0;
+      const fixAmt = existingRule ? Number(existingRule.waiver_amount || 0) : 0;
+      const discount = Math.max(baseAmt * (pct / 100), fixAmt);
+      const netDue = Math.max(0, baseAmt - discount);
+
       rulesMap[h.id] = {
         waiver_percent: existingRule ? String(existingRule.waiver_percent) : '0',
         waiver_amount: existingRule ? String(existingRule.waiver_amount) : '0',
+        applicable_fee: String(Math.round(netDue * 100) / 100),
         reason: existingRule ? (existingRule.reason || '') : ''
       };
     });
     setTypeHeadRules(rulesMap);
     setShowTypeModal(true);
+  };
+
+  const handleApplicableFeeChange = (headId, val, baseAmt) => {
+    if (val === '') {
+      setTypeHeadRules(prev => ({
+        ...prev,
+        [headId]: {
+          ...prev[headId],
+          applicable_fee: '',
+          waiver_percent: '0',
+          waiver_amount: '0'
+        }
+      }));
+      return;
+    }
+
+    const numVal = parseFloat(val);
+    if (isNaN(numVal)) {
+      setTypeHeadRules(prev => ({
+        ...prev,
+        [headId]: {
+          ...prev[headId],
+          applicable_fee: val
+        }
+      }));
+      return;
+    }
+
+    const cappedFee = Math.max(0, Math.min(baseAmt, numVal));
+    const discountAmt = Math.max(0, baseAmt - cappedFee);
+    const calculatedPct = baseAmt > 0 ? ((discountAmt / baseAmt) * 100) : 0;
+    const roundedPct = Math.round(calculatedPct * 100) / 100;
+
+    let defaultReason = '';
+    if (roundedPct === 100) defaultReason = `100% Waived (${typeFormName || 'Scheme'})`;
+    else if (roundedPct > 0) defaultReason = `${roundedPct}% Concession (Fee: ₹${cappedFee.toLocaleString('en-IN')})`;
+    else defaultReason = 'Standard Fee';
+
+    setTypeHeadRules(prev => ({
+      ...prev,
+      [headId]: {
+        ...prev[headId],
+        applicable_fee: val,
+        waiver_percent: String(roundedPct),
+        waiver_amount: String(Math.round(discountAmt * 100) / 100),
+        reason: prev[headId]?.reason || defaultReason
+      }
+    }));
+  };
+
+  const handleWaiverPercentChange = (headId, val, baseAmt) => {
+    if (val === '') {
+      setTypeHeadRules(prev => ({
+        ...prev,
+        [headId]: {
+          ...prev[headId],
+          waiver_percent: '',
+          waiver_amount: '0',
+          applicable_fee: String(baseAmt)
+        }
+      }));
+      return;
+    }
+
+    const numPct = parseFloat(val);
+    if (isNaN(numPct)) {
+      setTypeHeadRules(prev => ({
+        ...prev,
+        [headId]: {
+          ...prev[headId],
+          waiver_percent: val
+        }
+      }));
+      return;
+    }
+
+    const cappedPct = Math.max(0, Math.min(100, numPct));
+    const discountAmt = baseAmt * (cappedPct / 100);
+    const netDue = Math.max(0, baseAmt - discountAmt);
+
+    let defaultReason = '';
+    if (cappedPct === 100) defaultReason = `100% Waived (${typeFormName || 'Scheme'})`;
+    else if (cappedPct > 0) defaultReason = `${cappedPct}% Discount (${typeFormName || 'Scheme'})`;
+    else defaultReason = 'Standard Fee';
+
+    setTypeHeadRules(prev => ({
+      ...prev,
+      [headId]: {
+        ...prev[headId],
+        waiver_percent: val,
+        waiver_amount: String(Math.round(discountAmt * 100) / 100),
+        applicable_fee: String(Math.round(netDue * 100) / 100),
+        reason: prev[headId]?.reason || defaultReason
+      }
+    }));
   };
 
   const handleRuleChange = (headId, field, val) => {
@@ -164,13 +267,16 @@ export default function Settings({ user }) {
     }));
   };
 
-  const handleApplyPreset = (headId, percent, defaultReason) => {
+  const handleApplyPreset = (headId, percent, defaultReason, baseAmt) => {
+    const discountAmt = baseAmt * (percent / 100);
+    const netDue = Math.max(0, baseAmt - discountAmt);
     setTypeHeadRules(prev => ({
       ...prev,
       [headId]: {
         ...prev[headId],
         waiver_percent: String(percent),
-        waiver_amount: '0',
+        waiver_amount: String(Math.round(discountAmt * 100) / 100),
+        applicable_fee: String(Math.round(netDue * 100) / 100),
         reason: defaultReason
       }
     }));
@@ -1263,61 +1369,88 @@ export default function Settings({ user }) {
                             <span className="text-[10px] text-slate-400 font-semibold mr-1">Presets:</span>
                             <button
                               type="button"
-                              onClick={() => handleApplyPreset(head.id, 100, `100% Waived (${typeFormName || 'Scheme'})`)}
+                              onClick={() => handleApplyPreset(head.id, 100, `100% Waived (${typeFormName || 'Scheme'})`, baseAmt)}
                               className="px-2 py-0.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[10px] font-bold rounded"
                             >
-                              100% Waived
+                              100% Waived (₹0)
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleApplyPreset(head.id, 50, `50% Discount (${typeFormName || 'Scheme'})`)}
+                              onClick={() => handleApplyPreset(head.id, 50, `50% Discount (${typeFormName || 'Scheme'})`, baseAmt)}
                               className="px-2 py-0.5 bg-blue-100 hover:bg-blue-200 text-blue-800 text-[10px] font-bold rounded"
                             >
-                              50% Discount
+                              50% (₹{(baseAmt / 2).toLocaleString('en-IN')})
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleApplyPreset(head.id, 0, `Standard Fee`)}
+                              onClick={() => handleApplyPreset(head.id, 0, `Standard Fee`, baseAmt)}
                               className="px-2 py-0.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-bold rounded"
                             >
-                              0% (Full Fee)
+                              Full Fee (₹{baseAmt.toLocaleString('en-IN')})
                             </button>
                           </div>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                           <div>
-                            <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Waiver Percentage (%)</label>
+                            <div className="flex items-center justify-between mb-0.5">
+                              <label className="text-[10px] font-bold text-blue-900">
+                                Applicable Fee (₹)
+                              </label>
+                              <span className="text-[9px] text-blue-600 font-bold bg-blue-50 px-1 rounded">Direct Entry</span>
+                            </div>
+                            <input
+                              type="number"
+                              min="0"
+                              max={baseAmt}
+                              step="0.01"
+                              placeholder={`e.g. ${baseAmt}`}
+                              value={rule.applicable_fee !== undefined ? rule.applicable_fee : String(netAmt)}
+                              onChange={(e) => handleApplicableFeeChange(head.id, e.target.value, baseAmt)}
+                              className="w-full px-2.5 py-1.5 border-2 border-blue-400 focus:border-blue-600 rounded-lg focus:ring-1 focus:ring-blue-600 font-mono font-black text-xs text-blue-950 bg-blue-50/20"
+                            />
+                            <div className="text-[9px] text-slate-500 mt-0.5">
+                              Amount student pays personally
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="flex items-center justify-between mb-0.5">
+                              <label className="text-[10px] font-semibold text-slate-600">
+                                Waiver % / Discount
+                              </label>
+                              {discountAmt > 0 && (
+                                <span className="text-[9px] text-emerald-700 font-bold">
+                                  -₹{discountAmt.toLocaleString('en-IN')}
+                                </span>
+                              )}
+                            </div>
                             <input
                               type="number"
                               min="0"
                               max="100"
                               step="0.01"
                               value={rule.waiver_percent}
-                              onChange={(e) => handleRuleChange(head.id, 'waiver_percent', e.target.value)}
-                              className="w-full px-2.5 py-1.5 border rounded-lg focus:ring-1 focus:ring-blue-600 font-mono font-bold text-xs bg-white"
+                              onChange={(e) => handleWaiverPercentChange(head.id, e.target.value, baseAmt)}
+                              className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-600 font-mono font-bold text-xs bg-white"
                             />
-                          </div>
-
-                          <div>
-                            <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Calculated Net Due</label>
-                            <div className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono">
-                              <span className="font-bold text-slate-900">₹{netAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                              {discountAmt > 0 && (
-                                <span className="text-emerald-600 text-[10px] ml-1.5">(-₹{discountAmt.toLocaleString('en-IN')})</span>
-                              )}
+                            <div className="text-[9px] text-slate-500 mt-0.5">
+                              {discountAmt > 0 ? `Govt/Quota saves ₹${discountAmt.toLocaleString('en-IN')}` : 'Standard full fee'}
                             </div>
                           </div>
 
                           <div>
-                            <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Reason / Display Note</label>
+                            <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Reason / Display Note</label>
                             <input
                               type="text"
-                              placeholder="e.g. 50% EBC Discount"
+                              placeholder="e.g. 50% OBC Concession"
                               value={rule.reason}
                               onChange={(e) => handleRuleChange(head.id, 'reason', e.target.value)}
-                              className="w-full px-2.5 py-1.5 border rounded-lg focus:ring-1 focus:ring-blue-600 text-xs bg-white"
+                              className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-600 text-xs bg-white"
                             />
+                            <div className="text-[9px] text-slate-400 mt-0.5">
+                              Shown on student ledger & voucher
+                            </div>
                           </div>
                         </div>
                       </div>

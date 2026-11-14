@@ -5,6 +5,7 @@ import {
   RefreshCw, FileText, History, Trash2, ArrowRight 
 } from 'lucide-react';
 import StudentSelect from '../components/StudentSelect';
+import ModalDialog from '../components/ModalDialog';
 
 export default function Scholarships() {
   const [scholarships, setScholarships] = useState([]);
@@ -28,6 +29,11 @@ export default function Scholarships() {
   // History Modal State
   const [historyTarget, setHistoryTarget] = useState(null);
   const [deletingDisbId, setDeletingDisbId] = useState(null);
+
+  // Custom Modal Dialog States
+  const [resetModal, setResetModal] = useState({ isOpen: false, sc: null, loading: false });
+  const [deleteDisbModal, setDeleteDisbModal] = useState({ isOpen: false, scId: null, disbId: null, loading: false });
+  const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '' });
 
   // Form State for manual entry
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -174,32 +180,49 @@ export default function Scholarships() {
     }
   };
 
-  const handleMarkPending = async (sc) => {
-    if (!window.confirm(`Reset all recorded disbursements for ${sc.student_name} (${sc.scholarship_name}) back to 'NOT RECEIVED'?`)) {
-      return;
-    }
+  const handleOpenResetPending = (sc) => {
+    setResetModal({ isOpen: true, sc, loading: false });
+  };
+
+  const handleConfirmResetPending = async () => {
+    if (!resetModal.sc) return;
+    setResetModal(prev => ({ ...prev, loading: true }));
     try {
-      await api.markScholarshipPending(sc.id);
+      await api.markScholarshipPending(resetModal.sc.id);
+      setResetModal({ isOpen: false, sc: null, loading: false });
       loadData();
-      if (historyTarget && historyTarget.id === sc.id) {
+      if (historyTarget && historyTarget.id === resetModal.sc.id) {
         setHistoryTarget(null);
       }
     } catch (err) {
-      alert(err.message || 'Failed to update scholarship status.');
+      setResetModal({ isOpen: false, sc: null, loading: false });
+      setAlertModal({
+        isOpen: true,
+        title: 'Status Reset Failed',
+        message: err.message || 'Failed to update scholarship status.'
+      });
     }
   };
 
-  const handleDeleteDisbursement = async (scId, disbId) => {
-    if (!window.confirm("Delete this recorded installment? The scholarship received and remaining balance will recalculate automatically.")) return;
-    setDeletingDisbId(disbId);
+  const handleOpenDeleteDisb = (scId, disbId) => {
+    setDeleteDisbModal({ isOpen: true, scId, disbId, loading: false });
+  };
+
+  const handleConfirmDeleteDisb = async () => {
+    if (!deleteDisbModal.scId || !deleteDisbModal.disbId) return;
+    setDeleteDisbModal(prev => ({ ...prev, loading: true }));
     try {
-      const updatedSc = await api.deleteScholarshipDisbursement(scId, disbId);
+      const updatedSc = await api.deleteScholarshipDisbursement(deleteDisbModal.scId, deleteDisbModal.disbId);
       setHistoryTarget(updatedSc);
+      setDeleteDisbModal({ isOpen: false, scId: null, disbId: null, loading: false });
       loadData();
     } catch (err) {
-      alert(err.message || 'Failed to delete disbursement entry.');
-    } finally {
-      setDeletingDisbId(null);
+      setDeleteDisbModal({ isOpen: false, scId: null, disbId: null, loading: false });
+      setAlertModal({
+        isOpen: true,
+        title: 'Deletion Failed',
+        message: err.message || 'Failed to delete disbursement entry.'
+      });
     }
   };
 
@@ -489,7 +512,7 @@ export default function Scholarships() {
                           )}
                           {rec > 0 && (
                             <button
-                              onClick={() => handleMarkPending(s)}
+                              onClick={() => handleOpenResetPending(s)}
                               className="text-slate-400 hover:text-amber-600 p-1 rounded hover:bg-amber-50 transition"
                               title="Reset all disbursements for this claim back to Not Received"
                             >
@@ -712,6 +735,7 @@ export default function Scholarships() {
                     <tr>
                       <th className="px-3 py-2">Date</th>
                       <th className="px-3 py-2 text-right">Amount (₹)</th>
+                      <th className="px-3 py-2">Receipt #</th>
                       <th className="px-3 py-2">Sanction Order #</th>
                       <th className="px-3 py-2">Remarks</th>
                       <th className="px-3 py-2 text-center">Action</th>
@@ -720,7 +744,7 @@ export default function Scholarships() {
                   <tbody className="divide-y divide-slate-100 font-medium">
                     {(!historyTarget.disbursements || historyTarget.disbursements.length === 0) ? (
                       <tr>
-                        <td colSpan="5" className="px-3 py-4 text-center text-slate-400">
+                        <td colSpan="6" className="px-3 py-4 text-center text-slate-400">
                           Total recorded received: ₹{Number(historyTarget.received_amount || (historyTarget.status === 'RECEIVED' ? historyTarget.amount : 0)).toLocaleString('en-IN')}. (Initial legacy disbursement entry)
                         </td>
                       </tr>
@@ -731,11 +755,20 @@ export default function Scholarships() {
                           <td className="px-3 py-2 text-right font-mono font-bold text-emerald-700">
                             ₹{Number(d.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </td>
+                          <td className="px-3 py-2 font-mono">
+                            {d.receipt_no ? (
+                              <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
+                                {d.receipt_no}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
                           <td className="px-3 py-2 font-mono text-slate-600">{d.sanction_order_no || '—'}</td>
                           <td className="px-3 py-2 text-slate-500">{d.remarks || `Installment ${idx + 1}`}</td>
                           <td className="px-3 py-2 text-center">
                             <button
-                              onClick={() => handleDeleteDisbursement(historyTarget.id, d.id)}
+                              onClick={() => handleOpenDeleteDisb(historyTarget.id, d.id)}
                               disabled={deletingDisbId === d.id}
                               className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 transition"
                               title="Delete this installment"
@@ -893,6 +926,45 @@ export default function Scholarships() {
           </div>
         </div>
       )}
+
+      {/* Reset to Pending Confirmation Modal */}
+      <ModalDialog
+        isOpen={resetModal.isOpen}
+        type="warning"
+        confirmVariant="warning"
+        title="Reset Scholarship Disbursements?"
+        message={`Are you sure you want to reset all recorded disbursements for ${resetModal.sc?.student_name} (${resetModal.sc?.scholarship_name}) back to 'NOT RECEIVED'? This will remove the associated government payment receipt(s) and restore pending balances.`}
+        confirmText={resetModal.loading ? "Resetting..." : "Yes, Reset to Pending"}
+        cancelText="Cancel"
+        loading={resetModal.loading}
+        onConfirm={handleConfirmResetPending}
+        onClose={() => setResetModal({ isOpen: false, sc: null, loading: false })}
+      />
+
+      {/* Delete Single Disbursement Confirmation Modal */}
+      <ModalDialog
+        isOpen={deleteDisbModal.isOpen}
+        type="danger"
+        confirmVariant="danger"
+        title="Delete Recorded Installment?"
+        message="Are you sure you want to delete this recorded installment? The associated government payment receipt will be removed, and the scholarship received and remaining balance will recalculate automatically."
+        confirmText={deleteDisbModal.loading ? "Deleting..." : "Yes, Delete Installment"}
+        cancelText="Cancel"
+        loading={deleteDisbModal.loading}
+        onConfirm={handleConfirmDeleteDisb}
+        onClose={() => setDeleteDisbModal({ isOpen: false, scId: null, disbId: null, loading: false })}
+      />
+
+      {/* Alert Error Modal */}
+      <ModalDialog
+        isOpen={alertModal.isOpen}
+        type="alert"
+        title={alertModal.title}
+        message={alertModal.message}
+        confirmText="OK"
+        onConfirm={() => setAlertModal({ isOpen: false, title: '', message: '' })}
+        onClose={() => setAlertModal({ isOpen: false, title: '', message: '' })}
+      />
     </div>
   );
 }
