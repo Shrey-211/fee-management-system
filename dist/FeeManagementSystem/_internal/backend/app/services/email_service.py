@@ -55,7 +55,7 @@ def interpolate_template(template_str: str, student: Student, due_date: str = "I
         "{total_due}": f"{net_due:,.2f}",
         "{fee_breakdown}": breakdown_text,
         "{due_date}": due_date,
-        "{college_name}": "College Fee Administration Office",
+        "{college_name}": settings.COLLEGE_NAME,
         "{sender_name}": settings.SMTP_FROM_NAME or "Accounts Officer"
     }
 

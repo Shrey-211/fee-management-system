@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../api/client';
 import { ShieldCheck, Lock, User, WifiOff, ArrowRight } from 'lucide-react';
+import collegeLogo from '../assets/college_logo_sm.png';
 
 export default function Login({ onLoginSuccess }) {
   const [username, setUsername] = useState('');
@@ -42,13 +43,21 @@ export default function Login({ onLoginSuccess }) {
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col justify-center items-center p-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
-        <div className="bg-gradient-to-br from-blue-900 via-blue-800 to-slate-900 p-8 text-white text-center">
-          <div className="w-14 h-14 bg-blue-600 rounded-2xl mx-auto flex items-center justify-center font-bold text-2xl shadow-lg border border-blue-400/30 mb-3">
-            ₹
+        <div className="bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900 p-8 text-white text-center">
+          <div className="w-20 h-20 bg-white rounded-2xl mx-auto flex items-center justify-center shadow-xl border-2 border-blue-400/40 p-1.5 mb-3">
+            <img src={collegeLogo} alt="College Logo" className="w-full h-full object-contain rounded-xl" />
           </div>
-          <h2 className="text-xl font-bold tracking-tight">College Fee Management System</h2>
-          <p className="text-xs text-blue-200 mt-1">Designated Offline Office Station — Mr. Shrikant's PC</p>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-950/60 border border-blue-400/20 text-[11px] text-blue-300 mt-3">
+          <p className="text-[11px] font-bold tracking-wider uppercase text-amber-300">
+            Krishna Foundation's
+          </p>
+          <h2 className="text-sm sm:text-base font-extrabold tracking-tight text-white leading-snug mt-0.5">
+            Shrimant Jayshreemaladevi Naik Nimbalkar Institute of Management Studies, Phaltan
+          </h2>
+          <div className="mt-2.5 pt-2 border-t border-blue-800/60">
+            <p className="text-xs font-semibold text-blue-100">Student Fee Management System</p>
+            <p className="text-[10px] text-blue-300">Designated Offline Station — Mr. Shrikant's PC</p>
+          </div>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-950/80 border border-blue-400/20 text-[10px] text-emerald-300 mt-2.5">
             <WifiOff className="w-3 h-3 text-emerald-400" />
             100% Offline Single-PC Secure Deployment
           </div>

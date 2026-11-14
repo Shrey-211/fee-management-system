@@ -1,5 +1,6 @@
 import React from 'react';
 import { ShieldCheck, LogOut, KeyRound, WifiOff } from 'lucide-react';
+import collegeLogo from '../assets/college_logo_sm.png';
 
 export default function Navbar({ user, onLogout, onChangePasswordClick }) {
   const roleBadgeColors = {
@@ -10,16 +11,20 @@ export default function Navbar({ user, onLogout, onChangePasswordClick }) {
 
   return (
     <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="h-10 w-10 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-lg text-white shadow-md">
-            ₹
-          </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-[4.25rem] py-2 flex items-center justify-between gap-4">
+        <div className="flex items-center space-x-3.5">
+          <img
+            src={collegeLogo}
+            alt="College Logo"
+            className="h-12 w-12 object-contain rounded-xl bg-white p-0.5 shadow-md border border-slate-700 shrink-0"
+          />
           <div>
-            <h1 className="text-base font-bold tracking-tight text-white flex items-center gap-2">
-              Student Fee Management System
+            <h1 className="text-xs sm:text-sm font-bold tracking-tight text-white leading-tight">
+              Krishna Foundation's Shrimant Jayshreemaladevi Naik Nimbalkar Institute of Management Studies, Phaltan
             </h1>
-            <p className="text-xs text-slate-400">Designated PC Office Installation (Mr. Shrikant's PC)</p>
+            <p className="text-[11px] sm:text-xs text-blue-300 font-medium mt-0.5">
+              Student Fee Management System <span className="text-slate-400 font-normal">| Designated Counter Station</span>
+            </p>
           </div>
         </div>
 

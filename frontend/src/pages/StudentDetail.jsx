@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { 
   ArrowLeft, Receipt, Plus, AlertCircle, 
-  Mail, Award, CheckCircle, Clock, FileText, Phone, MapPin, Edit3, X, Trash2 
+  Mail, Award, CheckCircle, Clock, FileText, Phone, MapPin, Edit3, X, Trash2, Printer 
 } from 'lucide-react';
 import ModalDialog from '../components/ModalDialog';
+import ReceiptModal from '../components/ReceiptModal';
+import StudentStatementModal from '../components/StudentStatementModal';
 
 export default function StudentDetail({ studentId, onBack, onRecordPayment, onLevyFine }) {
   const [student, setStudent] = useState(null);
@@ -17,6 +19,8 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
   const [deletePaymentDialog, setDeletePaymentDialog] = useState({ isOpen: false, payment: null, loading: false });
   const [resetScholarshipDialog, setResetScholarshipDialog] = useState({ isOpen: false, scId: null, loading: false });
   const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '', type: 'info' });
+  const [receiptModal, setReceiptModal] = useState({ isOpen: false, payment: null });
+  const [statementModal, setStatementModal] = useState(false);
 
   // Edit Profile Modal
   const [showEditModal, setShowEditModal] = useState(false);
@@ -363,6 +367,15 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
               Send Email Reminder
             </button>
           )}
+
+          <button
+            onClick={() => setStatementModal(true)}
+            className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow transition"
+            title="Print Official Student Fee Statement"
+          >
+            <Printer className="w-3.5 h-3.5 text-blue-400" />
+            Print Fee Statement
+          </button>
 
           <button
             onClick={() => onLevyFine(student)}
@@ -790,6 +803,13 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => setReceiptModal({ isOpen: true, payment: p })}
+                          className="p-1.5 text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded transition"
+                          title="Print Official College Receipt"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                        </button>
                         <button
                           onClick={() => handleOpenEditPayment(p)}
                           className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition"
@@ -1369,6 +1389,21 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
         confirmText="OK"
         onConfirm={() => setAlertModal({ isOpen: false, title: '', message: '', type: 'info' })}
         onClose={() => setAlertModal({ isOpen: false, title: '', message: '', type: 'info' })}
+      />
+
+      {/* Official College Printable Receipt Modal */}
+      <ReceiptModal
+        isOpen={receiptModal.isOpen}
+        payment={receiptModal.payment}
+        student={student}
+        onClose={() => setReceiptModal({ isOpen: false, payment: null })}
+      />
+
+      {/* Official College Printable Student Fee Statement */}
+      <StudentStatementModal
+        isOpen={statementModal}
+        student={student}
+        onClose={() => setStatementModal(false)}
       />
     </div>
   );

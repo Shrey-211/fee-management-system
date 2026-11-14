@@ -3,6 +3,7 @@ import {
   LayoutDashboard, Users, Receipt, 
   AlertCircle, Award, FileSpreadsheet, Mail, Settings 
 } from 'lucide-react';
+import collegeLogo from '../assets/college_logo_sm.png';
 
 export default function Sidebar({ currentTab, setTab, user }) {
   const navItems = [
@@ -49,7 +50,17 @@ export default function Sidebar({ currentTab, setTab, user }) {
         })}
       </div>
 
-      <div className="pt-4 border-t border-slate-100">
+      <div className="pt-4 border-t border-slate-100 space-y-2.5">
+        <div className="flex items-center gap-2.5 px-2 py-1.5 bg-slate-50 rounded-lg border border-slate-200/80">
+          <img src={collegeLogo} alt="Logo" className="w-8 h-8 rounded-lg object-contain bg-white border border-slate-200 p-0.5 shrink-0 shadow-xs" />
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-slate-800 leading-tight truncate" title="Krishna Foundation's SJNNIMS, Phaltan">
+              KF's SJNNIMS
+            </p>
+            <p className="text-[10px] text-slate-500 truncate">Phaltan, Satara</p>
+          </div>
+        </div>
+
         <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs text-slate-500 space-y-1">
           <div className="flex justify-between items-center text-slate-700 font-semibold">
             <span>Offline Localhost</span>

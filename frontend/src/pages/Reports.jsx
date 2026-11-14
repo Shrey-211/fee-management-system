@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
-import { FileSpreadsheet, Download, Calendar, Filter, ArrowUpDown, Search } from 'lucide-react';
+import { FileSpreadsheet, Download, Calendar, Filter, ArrowUpDown, Search, Printer } from 'lucide-react';
+import collegeLogo from '../assets/college_logo_sm.png';
 
 export default function Reports({ onSelectStudent }) {
   const [activeReport, setActiveReport] = useState('daily'); // 'daily' | 'outstanding'
@@ -115,6 +116,35 @@ export default function Reports({ onSelectStudent }) {
       {/* DAILY / DATE-RANGE REPORT VIEW */}
       {activeReport === 'daily' && (
         <div className="space-y-4">
+          {/* Official College Report Header */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <img
+                src={collegeLogo}
+                alt="College Logo"
+                className="w-12 h-12 object-contain rounded-lg p-0.5 border border-slate-200 bg-slate-50 shrink-0"
+              />
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Krishna Foundation's
+                </p>
+                <h3 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">
+                  Shrimant Jayshreemaladevi Naik Nimbalkar Institute of Management Studies, Phaltan
+                </h3>
+                <p className="text-[11px] text-blue-700 font-semibold mt-0.5">
+                  Daily & Date-Range Fee Collection Report • {startDate} to {endDate}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => window.print()}
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition border border-slate-300 self-end sm:self-auto"
+            >
+              <Printer className="w-3.5 h-3.5 text-slate-600" />
+              Print Preview
+            </button>
+          </div>
+
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
               <div className="flex items-center gap-2 text-xs">
@@ -301,6 +331,35 @@ export default function Reports({ onSelectStudent }) {
       {/* OUTSTANDING BALANCES REPORT VIEW */}
       {activeReport === 'outstanding' && (
         <div className="space-y-4">
+          {/* Official College Report Header */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <img
+                src={collegeLogo}
+                alt="College Logo"
+                className="w-12 h-12 object-contain rounded-lg p-0.5 border border-slate-200 bg-slate-50 shrink-0"
+              />
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Krishna Foundation's
+                </p>
+                <h3 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">
+                  Shrimant Jayshreemaladevi Naik Nimbalkar Institute of Management Studies, Phaltan
+                </h3>
+                <p className="text-[11px] text-rose-700 font-semibold mt-0.5">
+                  Student Outstanding Fee Balances & Ledger Dues Report
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => window.print()}
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition border border-slate-300 self-end sm:self-auto"
+            >
+              <Printer className="w-3.5 h-3.5 text-slate-600" />
+              Print Preview
+            </button>
+          </div>
+
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-3 w-full md:w-auto flex-1">
               <div className="relative flex-1 min-w-[200px] max-w-xs">

@@ -1,12 +1,15 @@
 import io
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 from typing import Dict, List, Any, Optional
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.drawing.image import Image as OpenpyxlImage
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from ..config import settings
 from ..models.payment import Payment, PaymentItem
 from ..models.student import Student
 from ..models.fee import FeeHead, StudentFeeHead
@@ -36,6 +39,49 @@ def style_row(row, fill=None, font=NORMAL_FONT, alignment=None, border=THIN_BORD
             cell.alignment = alignment
         if border:
             cell.border = border
+
+
+def add_college_excel_header(ws, report_title: str, subtitle: str, end_col: str = "H") -> int:
+    """
+    Adds full institutional college header at the top of the Excel worksheet spanning all columns.
+    Returns row index (6) where table headers begin.
+    """
+    # Set professional row heights for header block
+    ws.row_dimensions[1].height = 32
+    ws.row_dimensions[2].height = 18
+    ws.row_dimensions[3].height = 20
+    ws.row_dimensions[4].height = 18
+    ws.row_dimensions[5].height = 10
+
+    # Row 1: Full College Name spanning from Column A to End Column at the very top
+    ws.merge_cells(f"A1:{end_col}1")
+    cell_r1 = ws["A1"]
+    cell_r1.value = settings.COLLEGE_NAME.upper()
+    cell_r1.font = Font(name="Calibri", size=13, bold=True, color="1E3A8A")
+    cell_r1.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    # Row 2: College Location & Affiliation
+    ws.merge_cells(f"A2:{end_col}2")
+    cell_r2 = ws["A2"]
+    cell_r2.value = f"{settings.COLLEGE_ADDRESS} | {settings.COLLEGE_TAGLINE}"
+    cell_r2.font = Font(name="Calibri", size=9.5, italic=True, color="475569")
+    cell_r2.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Row 3: System & Report Title
+    ws.merge_cells(f"A3:{end_col}3")
+    cell_r3 = ws["A3"]
+    cell_r3.value = f"COLLEGE FEE MANAGEMENT SYSTEM — {report_title.upper()}"
+    cell_r3.font = Font(name="Calibri", size=11, bold=True, color="0F172A")
+    cell_r3.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Row 4: Period & Metadata
+    ws.merge_cells(f"A4:{end_col}4")
+    cell_r4 = ws["A4"]
+    cell_r4.value = subtitle
+    cell_r4.font = Font(name="Calibri", size=9.5, italic=True, color="64748B")
+    cell_r4.alignment = Alignment(horizontal="center", vertical="center")
+
+    return 6
 
 
 def generate_daily_collection_report(
@@ -100,6 +146,9 @@ def generate_daily_collection_report(
         })
 
     return {
+        "college_name": settings.COLLEGE_NAME,
+        "college_short_name": settings.COLLEGE_SHORT_NAME,
+        "college_address": settings.COLLEGE_ADDRESS,
         "report_date": str(report_date) if report_date else "Custom Range",
         "start_date": str(start_date) if start_date else None,
         "end_date": str(end_date) if end_date else None,
@@ -119,28 +168,24 @@ def export_daily_collection_excel(db: Session, start_date: date, end_date: date)
     ws = wb.active
     ws.title = "Daily Collection Report"
 
-    # College Title Header
-    ws.merge_cells("A1:H1")
-    ws["A1"] = "COLLEGE FEE MANAGEMENT SYSTEM — FEE COLLECTION REPORT"
-    ws["A1"].font = Font(name="Calibri", size=14, bold=True, color="1E3A8A")
-    ws["A1"].alignment = Alignment(horizontal="center")
+    # College Title Header at the top
+    header_row = add_college_excel_header(
+        ws,
+        report_title="Daily Fee Collection Report",
+        subtitle=f"Period: {start_date} to {end_date} | Phaltan, Maharashtra | Generated: {date.today()}",
+        end_col="H"
+    )
 
-    ws.merge_cells("A2:H2")
-    ws["A2"] = f"Period: {start_date} to {end_date} | Generated Offline"
-    ws["A2"].font = Font(name="Calibri", size=10, italic=True)
-    ws["A2"].alignment = Alignment(horizontal="center")
-
-    ws.append([]) # Row 3 blank
-
-    # Table Headers
+    # Table Headers at Row 6
     headers = [
         "Receipt Date", "System Receipt #", "Manual Receipt #", "Student ID", 
         "Student Name", "Category", "Payment Mode", "Amount (₹)"
     ]
-    ws.append(headers)
-    style_row(ws[4], fill=HEADER_FILL, font=HEADER_FONT, alignment=Alignment(horizontal="center"))
+    for c_idx, h in enumerate(headers, 1):
+        ws.cell(row=header_row, column=c_idx, value=h)
+    style_row(ws[header_row], fill=HEADER_FILL, font=HEADER_FONT, alignment=Alignment(horizontal="center"))
 
-    row_idx = 5
+    row_idx = header_row + 1
     for item in report_data["items"]:
         row_vals = [
             item["payment_date"],
@@ -152,16 +197,18 @@ def export_daily_collection_excel(db: Session, start_date: date, end_date: date)
             item["payment_mode"],
             item["total_amount"]
         ]
-        ws.append(row_vals)
+        for c_idx, val in enumerate(row_vals, 1):
+            ws.cell(row=row_idx, column=c_idx, value=val)
         style_row(ws[row_idx], font=NORMAL_FONT)
         ws[f"H{row_idx}"].number_format = "#,##0.00"
         row_idx += 1
 
     # Total Row
-    total_row = [
+    total_vals = [
         "TOTAL", "", "", "", "", "", "", report_data["total_collected"]
     ]
-    ws.append(total_row)
+    for c_idx, val in enumerate(total_vals, 1):
+        ws.cell(row=row_idx, column=c_idx, value=val)
     style_row(ws[row_idx], fill=TOTAL_FILL, font=BOLD_FONT)
     ws[f"H{row_idx}"].number_format = "#,##0.00"
 
@@ -183,27 +230,24 @@ def export_outstanding_dues_excel(db: Session, academic_year: Optional[str] = No
     ws = wb.active
     ws.title = "Outstanding Fee Balances"
 
-    ws.merge_cells("A1:K1")
-    ws["A1"] = "COLLEGE FEE MANAGEMENT SYSTEM — OUTSTANDING BALANCES REPORT"
-    ws["A1"].font = Font(name="Calibri", size=14, bold=True, color="1E3A8A")
-    ws["A1"].alignment = Alignment(horizontal="center")
-
-    ws.merge_cells("A2:K2")
-    ws["A2"] = f"Academic Year: {academic_year or 'All Years'} | Includes Applicable Waivers & Fines"
-    ws["A2"].font = Font(name="Calibri", size=10, italic=True)
-    ws["A2"].alignment = Alignment(horizontal="center")
-
-    ws.append([])
+    # College Title Header at the top
+    header_row = add_college_excel_header(
+        ws,
+        report_title="Student Outstanding Balances Report",
+        subtitle=f"Academic Year: {academic_year or 'All Years'} | Includes Applicable Waivers & Fines | Phaltan, Maharashtra | Generated: {date.today()}",
+        end_col="K"
+    )
 
     headers = [
         "Student Code", "Student Name", "Gender", "Category", "Mobile",
         "Applicable Fee (₹)", "Fee Paid (₹)", "Fee Balance (₹)", 
         "Fines Total (₹)", "Fines Paid (₹)", "Net Total Due (₹)"
     ]
-    ws.append(headers)
-    style_row(ws[4], fill=HEADER_FILL, font=HEADER_FONT, alignment=Alignment(horizontal="center"))
+    for c_idx, h in enumerate(headers, 1):
+        ws.cell(row=header_row, column=c_idx, value=h)
+    style_row(ws[header_row], fill=HEADER_FILL, font=HEADER_FONT, alignment=Alignment(horizontal="center"))
 
-    row_idx = 5
+    row_idx = header_row + 1
     tot_fee = Decimal("0.00")
     tot_paid = Decimal("0.00")
     tot_fee_bal = Decimal("0.00")
@@ -232,23 +276,25 @@ def export_outstanding_dues_excel(db: Session, academic_year: Optional[str] = No
         tot_fines_paid += fines_p
         tot_overall_due += net_due
 
-        row = [
+        row_vals = [
             s.student_code, s.full_name, s.gender, s.category, s.mobile_number or "N/A",
             float(applicable), float(fee_paid), float(fee_bal),
             float(fines_amt), float(fines_p), float(net_due)
         ]
-        ws.append(row)
+        for c_idx, val in enumerate(row_vals, 1):
+            ws.cell(row=row_idx, column=c_idx, value=val)
         style_row(ws[row_idx], font=NORMAL_FONT)
         for c in ["F", "G", "H", "I", "J", "K"]:
             ws[f"{c}{row_idx}"].number_format = "#,##0.00"
         row_idx += 1
 
-    total_row = [
+    total_vals = [
         "TOTAL", "", "", "", "",
         float(tot_fee), float(tot_paid), float(tot_fee_bal),
         float(tot_fines), float(tot_fines_paid), float(tot_overall_due)
     ]
-    ws.append(total_row)
+    for c_idx, val in enumerate(total_vals, 1):
+        ws.cell(row=row_idx, column=c_idx, value=val)
     style_row(ws[row_idx], fill=TOTAL_FILL, font=BOLD_FONT)
     for c in ["F", "G", "H", "I", "J", "K"]:
         ws[f"{c}{row_idx}"].number_format = "#,##0.00"
@@ -257,6 +303,7 @@ def export_outstanding_dues_excel(db: Session, academic_year: Optional[str] = No
         max_len = max(len(str(cell.value or '')) for cell in col if not type(cell).__name__ == "MergedCell")
         col_letter = get_column_letter(col_idx)
         ws.column_dimensions[col_letter].width = max(max_len + 3, 14)
+    ws.column_dimensions["A"].width = max(ws.column_dimensions["A"].width or 0, 16)
 
     output = io.BytesIO()
     wb.save(output)

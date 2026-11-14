@@ -227,7 +227,8 @@ def test_authentication_and_password_security(db):
 
 
 def test_excel_export_offline(db):
-    """Verifies Excel reports can be generated without errors or external network dependencies."""
+    """Verifies Excel reports can be generated with college header without errors or external network dependencies."""
+    import openpyxl
     student = Student(
         student_code="STU-EXP-01",
         full_name="Export Tester",
@@ -243,7 +244,15 @@ def test_excel_export_offline(db):
     stream1 = export_daily_collection_excel(db, date.today(), date.today())
     assert stream1.getvalue() is not None
     assert len(stream1.getvalue()) > 1000  # Valid Excel file bytes
+    wb1 = openpyxl.load_workbook(stream1)
+    ws1 = wb1.active
+    header_val1 = ws1["B1"].value or ws1["A1"].value or ""
+    assert "KRISHNA FOUNDATION" in header_val1
 
     stream2 = export_outstanding_dues_excel(db, "2026-2027")
     assert stream2.getvalue() is not None
     assert len(stream2.getvalue()) > 1000
+    wb2 = openpyxl.load_workbook(stream2)
+    ws2 = wb2.active
+    header_val2 = ws2["B1"].value or ws2["A1"].value or ""
+    assert "KRISHNA FOUNDATION" in header_val2

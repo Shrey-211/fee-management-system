@@ -28,6 +28,10 @@ _secret_key = get_or_create_secret_key()
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ENV_PATH, extra="allow")
     APP_NAME: str = "Student Fee Management System"
+    COLLEGE_NAME: str = "Krishna Foundation's Shrimant Jayshreemaladevi Naik Nimbalkar Institute of Management Studies, Phaltan"
+    COLLEGE_SHORT_NAME: str = "KF's SJNNIMS, Phaltan"
+    COLLEGE_ADDRESS: str = "Phaltan, Dist. Satara, Maharashtra"
+    COLLEGE_TAGLINE: str = "Approved by AICTE New Delhi & Affiliated to Shivaji University, Kolhapur"
     VERSION: str = "1.0.0"
     DEBUG: bool = False
 
@@ -56,7 +60,7 @@ class Settings(BaseSettings):
     SMTP_USERNAME: str = ""
     SMTP_PASSWORD: str = ""
     SMTP_FROM_EMAIL: str = "accounts@college.edu"
-    SMTP_FROM_NAME: str = "College Fee Administration"
+    SMTP_FROM_NAME: str = "KF's SJNNIMS Accounts Office"
     SMTP_USE_TLS: bool = True
 
 settings = Settings()

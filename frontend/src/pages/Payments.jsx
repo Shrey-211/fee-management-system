@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { 
   Receipt, Plus, Search, Filter, Calendar, 
-  CheckCircle, X, AlertCircle, Edit3, Trash2, Award 
+  CheckCircle, X, AlertCircle, Edit3, Trash2, Award, Printer 
 } from 'lucide-react';
 import StudentSelect from '../components/StudentSelect';
 import ModalDialog from '../components/ModalDialog';
+import ReceiptModal from '../components/ReceiptModal';
 
 export default function Payments({ initialStudent, onClearInitialStudent, onSelectStudent }) {
   const [payments, setPayments] = useState([]);
@@ -20,6 +21,7 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
   // Delete & Alert Modals
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, payment: null, loading: false });
   const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '' });
+  const [receiptModal, setReceiptModal] = useState({ isOpen: false, payment: null });
 
   // Payment Form State
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -191,7 +193,7 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
 
     setSubmitting(true);
     try {
-      await api.createPayment({
+      const recordedPayment = await api.createPayment({
         student_id: parseInt(selectedStudentId),
         physical_receipt_no: trimmedReceipt || null,
         payment_date: paymentDate,
@@ -202,7 +204,9 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
       setShowModal(false);
       setPhysicalReceiptNo('');
       setRemarks('');
-      loadPayments();
+      await loadPayments();
+      // Prompt user with official college printable receipt
+      setReceiptModal({ isOpen: true, payment: recordedPayment });
     } catch (err) {
       setFormError(err.message || 'Payment entry failed. Please check input values.');
     } finally {
@@ -424,6 +428,13 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => setReceiptModal({ isOpen: true, payment: p })}
+                          className="p-1.5 text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded transition"
+                          title="Print Official College Receipt"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                        </button>
                         <button
                           onClick={() => handleOpenEditModal(p)}
                           className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition"
@@ -816,6 +827,13 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
         confirmText="OK"
         onConfirm={() => setAlertModal({ isOpen: false, title: '', message: '' })}
         onClose={() => setAlertModal({ isOpen: false, title: '', message: '' })}
+      />
+
+      {/* Official College Printable Receipt Modal */}
+      <ReceiptModal
+        isOpen={receiptModal.isOpen}
+        payment={receiptModal.payment}
+        onClose={() => setReceiptModal({ isOpen: false, payment: null })}
       />
     </div>
   );

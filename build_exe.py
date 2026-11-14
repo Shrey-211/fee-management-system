@@ -22,6 +22,7 @@ def build():
         "--clean",
         f"--add-data={root / 'frontend' / 'dist'};frontend/dist",
         f"--add-data={root / 'backend' / 'app'};backend/app",
+        f"--add-data={root / 'assets'};assets",
         "--hidden-import=uvicorn.logging",
         "--hidden-import=uvicorn.loops",
         "--hidden-import=uvicorn.loops.auto",
