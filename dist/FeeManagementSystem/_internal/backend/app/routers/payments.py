@@ -33,6 +33,7 @@ def serialize_payment(p: Payment) -> dict:
         "student_category": p.student.category if p.student else None,
         "student_course": p.student.course_branch if p.student else None,
         "student_academic_year": p.student.academic_year if p.student else None,
+        "student_current_year": p.student.current_year if p.student else 1,
         "payment_date": p.payment_date,
         "entry_date": p.entry_date,
         "payment_mode": p.payment_mode,

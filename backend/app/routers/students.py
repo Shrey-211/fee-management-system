@@ -30,6 +30,16 @@ def build_student_response(student: Student) -> dict:
 
     overall_balance = quantize_amount(fee_balance + total_fines_balance)
 
+    year_1_dues = sum([
+        quantize_amount(h.balance) for h in student.fee_heads
+        if getattr(h.fee_head, 'year_of_study', 1) == 1
+    ], Decimal("0.00"))
+
+    year_2_dues = sum([
+        quantize_amount(h.balance) for h in student.fee_heads
+        if getattr(h.fee_head, 'year_of_study', 1) == 2
+    ], Decimal("0.00"))
+
     # Scholarship calculations
     student_scholarships = getattr(student, 'scholarships', []) or []
     scholarship_total = sum([quantize_amount(s.amount) for s in student_scholarships], Decimal("0.00"))
@@ -73,6 +83,8 @@ def build_student_response(student: Student) -> dict:
         "total_fines": total_fines,
         "total_fines_paid": total_fines_paid,
         "total_fines_balance": total_fines_balance,
+        "year_1_dues": year_1_dues,
+        "year_2_dues": year_2_dues,
         "overall_balance": overall_balance,
         "scholarship_total": scholarship_total,
         "scholarship_received": scholarship_received,
@@ -86,6 +98,7 @@ def get_students(
     category: Optional[str] = None,
     gender: Optional[str] = None,
     academic_year: Optional[str] = None,
+    current_year: Optional[int] = Query(None, description="Filter by year: 1 (1st Year), 2 (2nd Year), 3 (Passed Out)"),
     has_dues_only: Optional[bool] = False,
     scholarship_status: Optional[str] = Query(None, description="RECEIVED, PARTIAL, NOT_RECEIVED, HAS_SCHOLARSHIP, NONE"),
     current_user: User = Depends(get_current_user),
@@ -105,6 +118,8 @@ def get_students(
         query = query.filter(Student.gender == gender.upper().strip())
     if academic_year:
         query = query.filter(Student.academic_year == academic_year.strip())
+    if current_year is not None:
+        query = query.filter(Student.current_year == current_year)
 
     students = query.order_by(Student.full_name.asc()).all()
     results = [build_student_response(s) for s in students]
@@ -152,6 +167,9 @@ def create_student(
         existing = db.query(Student).filter(Student.student_code == student_code).first()
         if existing:
             raise HTTPException(status_code=400, detail="Student Code / Roll Number already exists")
+
+    if student_in.mobile_number is not None and not student_in.mobile_number.strip():
+        raise HTTPException(status_code=400, detail="Mobile / Phone number cannot be blank.")
 
     student = Student(
         student_code=student_code,
@@ -218,7 +236,13 @@ def get_student_detail(
             "net_due": sfh.net_due,
             "paid_amount": sfh.paid_amount,
             "balance": sfh.balance,
-            "waiver_reason": sfh.waiver_reason
+            "waiver_reason": sfh.waiver_reason,
+            "year_of_study": getattr(sfh.fee_head, 'year_of_study', 1) if sfh.fee_head else 1,
+            "is_first_year_arrear": bool(
+                (student.current_year or 1) >= 2 and
+                sfh.fee_head and getattr(sfh.fee_head, 'year_of_study', 1) == 1 and
+                quantize_amount(sfh.balance) > Decimal("0.00")
+            )
         }
         for sfh in student.fee_heads
     ]
@@ -371,6 +395,8 @@ def update_student(
         student.concession_type_id = student_in.concession_type_id if student_in.concession_type_id != 0 else None
         category_or_gender_changed = True
     if student_in.mobile_number is not None:
+        if not student_in.mobile_number.strip():
+            raise HTTPException(status_code=400, detail="Mobile / Phone number cannot be blank.")
         student.mobile_number = student_in.mobile_number.strip()
     if student_in.email_address is not None:
         student.email_address = student_in.email_address.strip()
@@ -407,4 +433,51 @@ def update_student(
     recalculate_student_balances(student.id, db)
     db.refresh(student)
     return build_student_response(student)
+
+
+@router.post("/{student_id}/promote", response_model=StudentDetailResponse)
+def promote_student(
+    student_id: int,
+    current_user: User = Depends(require_accountant_or_admin),
+    db: Session = Depends(get_db)
+):
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    cur_year = student.current_year or 1
+    if cur_year == 1:
+        student.current_year = 2
+        # Assign 2nd Year Fee Heads while keeping 1st Year heads and unpaid balances
+        initialize_student_fees(student, db)
+        log_audit(
+            db,
+            action="PROMOTE_STUDENT",
+            entity_name="students",
+            entity_id=student.id,
+            user_id=current_user.id,
+            details={
+                "student_code": student.student_code,
+                "from_year": 1,
+                "to_year": 2
+            }
+        )
+    elif cur_year == 2:
+        student.current_year = 3  # 3 = Passed Out
+        log_audit(
+            db,
+            action="GRADUATE_STUDENT",
+            entity_name="students",
+            entity_id=student.id,
+            user_id=current_user.id,
+            details={
+                "student_code": student.student_code,
+                "from_year": 2,
+                "status": "PASSED_OUT"
+            }
+        )
+    db.commit()
+    recalculate_student_balances(student.id, db)
+    return get_student_detail(student.id, current_user=current_user, db=db)
+
 

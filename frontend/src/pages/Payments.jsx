@@ -554,10 +554,23 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
                   <div className="p-3 space-y-2">
                     {selectedStudentDetail.fee_heads.map((h) => {
                       const bal = Number(h.balance);
+                      const isArrear = h.is_first_year_arrear || (h.year_of_study === 1 && bal > 0 && selectedStudentDetail.current_year >= 2);
                       return (
-                        <div key={h.id} className="flex items-center justify-between gap-3 py-1 border-b border-slate-100 last:border-0">
+                        <div key={h.id} className={`flex items-center justify-between gap-3 py-1.5 border-b border-slate-100 last:border-0 ${isArrear ? 'bg-amber-50/40 px-2 rounded-lg' : ''}`}>
                           <div className="flex-1">
                             <span className="font-semibold text-slate-800">{h.name}</span>
+                            <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                              h.year_of_study === 2
+                                ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                                : 'bg-blue-100 text-blue-800 border border-blue-200'
+                            }`}>
+                              {h.year_of_study === 2 ? '2nd Year' : '1st Year'}
+                            </span>
+                            {isArrear && (
+                              <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300">
+                                Unpaid from 1st Year
+                              </span>
+                            )}
                             <span className="text-slate-400 ml-2">
                               (Due: <strong className="font-mono text-rose-600">₹{bal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>)
                             </span>

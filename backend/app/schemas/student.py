@@ -99,6 +99,8 @@ class StudentResponse(StudentBase):
     total_fines: Decimal = Decimal("0.00")
     total_fines_paid: Decimal = Decimal("0.00")
     total_fines_balance: Decimal = Decimal("0.00")
+    year_1_dues: Decimal = Decimal("0.00")
+    year_2_dues: Decimal = Decimal("0.00")
     overall_balance: Decimal = Decimal("0.00")
     scholarship_total: Decimal = Decimal("0.00")
     scholarship_received: Decimal = Decimal("0.00")

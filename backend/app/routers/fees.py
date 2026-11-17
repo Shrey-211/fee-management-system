@@ -19,12 +19,18 @@ router = APIRouter(prefix="/api/fees", tags=["Fees"])
 
 @router.get("/heads", response_model=List[FeeHeadResponse])
 def get_fee_heads(
-    academic_year: str = "2026-2027",
+    academic_year: Optional[str] = None,
+    year_of_study: Optional[int] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    heads = db.query(FeeHead).filter(FeeHead.academic_year == academic_year).all()
-    if not heads:
+    query = db.query(FeeHead)
+    if academic_year:
+        query = query.filter(FeeHead.academic_year == academic_year)
+    if year_of_study:
+        query = query.filter(FeeHead.year_of_study == year_of_study)
+    heads = query.all()
+    if not heads and not year_of_study and academic_year:
         heads = db.query(FeeHead).all()
     return heads
 
@@ -37,16 +43,18 @@ def create_fee_head(
 ):
     existing = db.query(FeeHead).filter(
         FeeHead.code == head_in.code.upper().strip(),
-        FeeHead.academic_year == head_in.academic_year
+        FeeHead.academic_year == head_in.academic_year,
+        FeeHead.year_of_study == head_in.year_of_study
     ).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Fee head code already exists for this academic year")
+        raise HTTPException(status_code=400, detail="Fee head code already exists for this academic year and year of study")
 
     head = FeeHead(
         name=head_in.name.strip(),
         code=head_in.code.upper().strip(),
         base_amount=quantize_amount(head_in.base_amount),
         academic_year=head_in.academic_year,
+        year_of_study=head_in.year_of_study,
         is_compulsory=head_in.is_compulsory,
         allows_waiver=head_in.allows_waiver
     )
@@ -58,7 +66,7 @@ def create_fee_head(
         entity_name="fee_heads",
         entity_id=head.id,
         user_id=admin.id,
-        details={"name": head.name, "code": head.code, "base_amount": str(head.base_amount)}
+        details={"name": head.name, "code": head.code, "year_of_study": head.year_of_study, "base_amount": str(head.base_amount)}
     )
     db.commit()
     db.refresh(head)
@@ -78,6 +86,8 @@ def update_fee_head(
 
     if head_in.name is not None:
         head.name = head_in.name.strip()
+    if head_in.year_of_study is not None:
+        head.year_of_study = head_in.year_of_study
     if head_in.base_amount is not None:
         head.base_amount = quantize_amount(head_in.base_amount)
         # Automatically synchronize all enrolled students' fee heads with the updated base amount
@@ -138,6 +148,8 @@ def get_concession_types(
     if academic_year:
         query = query.filter(FeeConcessionType.academic_year == academic_year)
     types = query.order_by(FeeConcessionType.type_group.asc(), FeeConcessionType.name.asc()).all()
+    if not types and academic_year:
+        types = db.query(FeeConcessionType).order_by(FeeConcessionType.type_group.asc(), FeeConcessionType.name.asc()).all()
     return [build_concession_type_response(t) for t in types]
 
 

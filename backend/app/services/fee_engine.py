@@ -135,19 +135,31 @@ def calculate_fee_waiver(
 
 def initialize_student_fees(student: Student, db: Session) -> List[StudentFeeHead]:
     """
-    Initializes or updates StudentFeeHead records for the student's academic year.
-    Preserves paid amounts if recalculating.
+    Initializes or updates StudentFeeHead records for the student.
+    - If student is enrolled in 1st Year (current_year == 1): assigns 1st Year fee heads.
+    - If student is in 2nd Year (current_year == 2): ensures 2nd Year fee heads are assigned,
+      while retaining any existing 1st Year fee heads (with their paid amounts and unpaid balances).
+    - Preserves all historical paid amounts and recalculates balances accurately.
     """
-    fee_heads = db.query(FeeHead).filter(FeeHead.academic_year == student.academic_year).all()
-    if not fee_heads:
-        # Flexible match (e.g. 26-27 or 2026-2027) or fallback to active fee heads
-        clean_ay = (student.academic_year or "").replace("20", "").strip()
-        fee_heads = db.query(FeeHead).filter(
-            (FeeHead.academic_year.like(f"%{student.academic_year}%")) |
-            (FeeHead.academic_year.like(f"%{clean_ay}%"))
-        ).all()
-        if not fee_heads:
-            fee_heads = db.query(FeeHead).all()
+    clean_ay = (student.academic_year or "").replace("20", "").strip()
+    all_heads = db.query(FeeHead).filter(
+        (FeeHead.academic_year == student.academic_year) |
+        (FeeHead.academic_year.like(f"%{clean_ay}%"))
+    ).all()
+    if not all_heads:
+        all_heads = db.query(FeeHead).all()
+
+    existing_head_ids = {sfh.fee_head_id for sfh in student.fee_heads}
+    student_year = student.current_year or 1
+
+    fee_heads = []
+    for fh in all_heads:
+        # Keep any fee head the student already has (preserves 1st year heads on promotion)
+        if fh.id in existing_head_ids:
+            fee_heads.append(fh)
+        # Assign heads matching the current year of study
+        elif getattr(fh, 'year_of_study', 1) == student_year:
+            fee_heads.append(fh)
 
     existing_sfh_map = {sfh.fee_head_id: sfh for sfh in student.fee_heads}
     result = []

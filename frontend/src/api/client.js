@@ -160,9 +160,24 @@ export const api = {
     method: 'PUT',
     body: JSON.stringify(data)
   }),
+  promoteStudent: (id) => request(`/students/${id}/promote`, {
+    method: 'POST'
+  }),
 
   // Fees
-  getFeeHeads: (academicYear) => request(`/fees/heads${academicYear ? `?academic_year=${academicYear}` : ''}`),
+  getFeeHeads: (params) => {
+    let q = '';
+    if (typeof params === 'string') {
+      q = `?academic_year=${params}`;
+    } else if (params && typeof params === 'object') {
+      q = '?' + new URLSearchParams(params).toString();
+    }
+    return request(`/fees/heads${q}`);
+  },
+  createFeeHead: (data) => request('/fees/heads', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
   updateFeeHead: (id, data) => request(`/fees/heads/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data)
@@ -240,24 +255,29 @@ export const api = {
     const q = new URLSearchParams(params).toString();
     return request(`/reports/daily${q ? `?${q}` : ''}`);
   },
-  downloadDailyReportExcel: async (startDate, endDate) => {
-    const q = new URLSearchParams({ start_date: startDate, end_date: endDate }).toString();
+  downloadDailyReportExcel: async (startDate, endDate, yearOfStudy = null) => {
+    const params = { start_date: startDate, end_date: endDate };
+    if (yearOfStudy) params.year_of_study = yearOfStudy;
+    const q = new URLSearchParams(params).toString();
     const blob = await request(`/reports/daily/excel?${q}`);
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `fee_collection_${startDate}_to_${endDate}.xlsx`;
+    a.download = `fee_collection_${startDate}_to_${endDate}${yearOfStudy ? `_yr${yearOfStudy}` : ''}.xlsx`;
     document.body.appendChild(a);
     a.click();
     a.remove();
   },
-  downloadOutstandingExcel: async (academicYear) => {
-    const q = academicYear ? `?academic_year=${academicYear}` : '';
-    const blob = await request(`/reports/outstanding/excel${q}`);
+  downloadOutstandingExcel: async (academicYear = null, yearOfStudy = null) => {
+    const params = {};
+    if (academicYear) params.academic_year = academicYear;
+    if (yearOfStudy) params.year_of_study = yearOfStudy;
+    const q = new URLSearchParams(params).toString();
+    const blob = await request(`/reports/outstanding/excel${q ? `?${q}` : ''}`);
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `outstanding_balances.xlsx`;
+    a.download = `outstanding_balances${yearOfStudy ? `_yr${yearOfStudy}` : ''}.xlsx`;
     document.body.appendChild(a);
     a.click();
     a.remove();

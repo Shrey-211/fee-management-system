@@ -6,6 +6,9 @@ import collegeLogo from '../assets/college_logo_sm.png';
 export default function Reports({ onSelectStudent }) {
   const [activeReport, setActiveReport] = useState('daily'); // 'daily' | 'outstanding'
 
+  // Common Year Filter ('': Both/All Years, '1': 1st Year, '2': 2nd Year)
+  const [yearFilter, setYearFilter] = useState('');
+
   // Daily Report State
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
@@ -23,7 +26,9 @@ export default function Reports({ onSelectStudent }) {
   const loadDailyReport = async () => {
     setLoadingDaily(true);
     try {
-      const data = await api.getDailyReport({ start_date: startDate, end_date: endDate });
+      const params = { start_date: startDate, end_date: endDate };
+      if (yearFilter) params.year_of_study = parseInt(yearFilter);
+      const data = await api.getDailyReport(params);
       setDailyData(data);
     } catch (e) {
       console.error(e);
@@ -38,6 +43,7 @@ export default function Reports({ onSelectStudent }) {
       const params = {};
       if (categoryFilter) params.category = categoryFilter;
       if (duesOnly) params.has_dues_only = true;
+      if (yearFilter) params.current_year = parseInt(yearFilter);
       const data = await api.getStudents(params);
       setStudents(data);
     } catch (e) {
@@ -53,14 +59,14 @@ export default function Reports({ onSelectStudent }) {
     } else {
       loadOutstandingReport();
     }
-  }, [activeReport, startDate, endDate, categoryFilter, duesOnly]);
+  }, [activeReport, startDate, endDate, categoryFilter, duesOnly, yearFilter]);
 
   const handleDownloadDailyExcel = () => {
-    api.downloadDailyReportExcel(startDate, endDate);
+    api.downloadDailyReportExcel(startDate, endDate, yearFilter ? parseInt(yearFilter) : null);
   };
 
   const handleDownloadOutstandingExcel = () => {
-    api.downloadOutstandingExcel();
+    api.downloadOutstandingExcel(null, yearFilter ? parseInt(yearFilter) : null);
   };
 
   const filteredDailyItems = (dailyData?.items || []).filter((item) => {
@@ -165,6 +171,19 @@ export default function Reports({ onSelectStudent }) {
                   onChange={(e) => setEndDate(e.target.value)}
                   className="px-3 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-600"
                 />
+              </div>
+
+              <div className="flex items-center gap-2 text-xs">
+                <span className="font-semibold text-slate-600">Year / Class:</span>
+                <select
+                  value={yearFilter}
+                  onChange={(e) => setYearFilter(e.target.value)}
+                  className="px-3 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-600 bg-white font-semibold text-slate-800"
+                >
+                  <option value="">Both Years (All)</option>
+                  <option value="1">1st Year Only (MBA-I)</option>
+                  <option value="2">2nd Year Only (MBA-II)</option>
+                </select>
               </div>
 
               {/* Quick Range Presets */}
@@ -282,6 +301,7 @@ export default function Reports({ onSelectStudent }) {
                         <th className="px-4 py-3">Manual Book #</th>
                         <th className="px-4 py-3">Student Name</th>
                         <th className="px-4 py-3">ID Code</th>
+                        <th className="px-4 py-3 text-center">Class / Year</th>
                         <th className="px-4 py-3">Category</th>
                         <th className="px-4 py-3">Mode</th>
                         <th className="px-4 py-3 text-right">Amount (₹)</th>
@@ -290,13 +310,13 @@ export default function Reports({ onSelectStudent }) {
                     <tbody className="divide-y divide-slate-100 font-medium">
                       {dailyData.items.length === 0 ? (
                         <tr>
-                          <td colSpan="8" className="px-4 py-8 text-center text-slate-400">
+                          <td colSpan="9" className="px-4 py-8 text-center text-slate-400">
                             No collection transactions found for this date range.
                           </td>
                         </tr>
                       ) : filteredDailyItems.length === 0 ? (
                         <tr>
-                          <td colSpan="8" className="px-4 py-8 text-center text-slate-400">
+                          <td colSpan="9" className="px-4 py-8 text-center text-slate-400">
                             No collection records matching "{dailySearch}".
                           </td>
                         </tr>
@@ -308,6 +328,15 @@ export default function Reports({ onSelectStudent }) {
                             <td className="px-4 py-3 font-mono font-black text-blue-900 bg-blue-50/20">{item.physical_receipt_no || '—'}</td>
                             <td className="px-4 py-3 font-bold text-slate-900">{item.student_name}</td>
                             <td className="px-4 py-3 font-mono text-slate-500">{item.student_code}</td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                item.student_current_year === 2
+                                  ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                                  : 'bg-blue-100 text-blue-800 border border-blue-200'
+                              }`}>
+                                {item.student_current_year === 2 ? '2nd Year' : '1st Year'}
+                              </span>
+                            </td>
                             <td className="px-4 py-3">{item.category}</td>
                             <td className="px-4 py-3">
                               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
@@ -375,6 +404,16 @@ export default function Reports({ onSelectStudent }) {
               </div>
 
               <select
+                value={yearFilter}
+                onChange={(e) => setYearFilter(e.target.value)}
+                className="py-1.5 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white font-semibold text-slate-800"
+              >
+                <option value="">All / Both Years</option>
+                <option value="1">1st Year Only (MBA-I)</option>
+                <option value="2">2nd Year Only (MBA-II)</option>
+              </select>
+
+              <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
                 className="py-1.5 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
@@ -421,6 +460,7 @@ export default function Reports({ onSelectStudent }) {
                   <tr>
                     <th className="px-4 py-3">Student ID</th>
                     <th className="px-4 py-3">Student Name</th>
+                    <th className="px-4 py-3 text-center">Class / Year</th>
                     <th className="px-4 py-3">Category</th>
                     <th className="px-4 py-3">Gender</th>
                     <th className="px-4 py-3">Phone</th>
@@ -433,13 +473,13 @@ export default function Reports({ onSelectStudent }) {
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {students.length === 0 ? (
                     <tr>
-                      <td colSpan="9" className="px-4 py-8 text-center text-slate-400">
+                      <td colSpan="10" className="px-4 py-8 text-center text-slate-400">
                         No students with outstanding balances found.
                       </td>
                     </tr>
                   ) : filteredOutstandingStudents.length === 0 ? (
                     <tr>
-                      <td colSpan="9" className="px-4 py-8 text-center text-slate-400">
+                      <td colSpan="10" className="px-4 py-8 text-center text-slate-400">
                         No students found matching "{studentSearch}".
                       </td>
                     </tr>
@@ -452,6 +492,17 @@ export default function Reports({ onSelectStudent }) {
                       >
                         <td className="px-4 py-3 font-mono font-bold text-blue-700">{s.student_code}</td>
                         <td className="px-4 py-3 font-bold text-slate-900">{s.full_name}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            s.current_year === 2
+                              ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                              : s.current_year === 1
+                              ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                              : 'bg-slate-100 text-slate-800 border border-slate-300'
+                          }`}>
+                            {s.current_year === 2 ? '2nd Year' : s.current_year === 1 ? '1st Year' : 'Passed Out'}
+                          </span>
+                        </td>
                         <td className="px-4 py-3">{s.category}</td>
                         <td className="px-4 py-3">{s.gender}</td>
                         <td className="px-4 py-3 text-slate-600">{s.mobile_number || '—'}</td>
@@ -464,8 +515,15 @@ export default function Reports({ onSelectStudent }) {
                         <td className="px-4 py-3 text-right font-mono text-amber-700">
                           {Number(s.total_fines_balance) > 0 ? `₹${Number(s.total_fines_balance).toLocaleString('en-IN')}` : '—'}
                         </td>
-                        <td className="px-4 py-3 text-right font-mono font-extrabold text-rose-600">
-                          ₹{Number(s.overall_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        <td className="px-4 py-3 text-right font-mono">
+                          <div className="font-extrabold text-rose-600">
+                            ₹{Number(s.overall_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </div>
+                          {s.current_year >= 2 && Number(s.year_1_dues || 0) > 0 && (
+                            <div className="text-[10px] text-amber-700 font-semibold mt-0.5">
+                              Incl. 1st Yr Arrears: ₹{Number(s.year_1_dues).toLocaleString('en-IN')}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))

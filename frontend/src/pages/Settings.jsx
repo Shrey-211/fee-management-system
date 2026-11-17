@@ -3,12 +3,15 @@ import { api } from '../api/client';
 import { 
   Settings as SettingsIcon, Database, Shield, 
   Mail, Users, Download, Plus, CheckCircle, RefreshCw, Save,
-  Layers, Edit2, Trash2, X, AlertTriangle, ArrowRight, Check
+  Layers, Edit2, Trash2, X, AlertTriangle, ArrowRight, Check,
+  GraduationCap
 } from 'lucide-react';
 import ModalDialog from '../components/ModalDialog';
 
 export default function Settings({ user }) {
   const [activeTab, setActiveTab] = useState('fees'); // 'fees' | 'users' | 'backups' | 'smtp'
+  const [feeYearTab, setFeeYearTab] = useState(1); // 1 = 1st Year (MBA-I), 2 = 2nd Year (MBA-II)
+  const [modalYearTab, setModalYearTab] = useState(1); // 1 = 1st Year, 2 = 2nd Year inside modal
 
   // Custom Popup Dialog States
   const [deleteTypeDialog, setDeleteTypeDialog] = useState({ isOpen: false, typeId: null, typeName: '', loading: false });
@@ -113,6 +116,7 @@ export default function Settings({ user }) {
   };
 
   const handleOpenAddType = () => {
+    setModalYearTab(feeYearTab);
     setEditingType(null);
     setTypeFormName('');
     setTypeFormCode('');
@@ -135,6 +139,7 @@ export default function Settings({ user }) {
   };
 
   const handleOpenEditType = (type) => {
+    setModalYearTab(feeYearTab);
     setEditingType(type);
     setTypeFormName(type.name);
     setTypeFormCode(type.code);
@@ -624,87 +629,148 @@ export default function Settings({ user }) {
 
       {/* 1. FEE HEADS CONFIGURATION */}
       {activeTab === 'fees' && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
-          <div className="border-b pb-3">
-            <h3 className="text-sm font-bold text-slate-900">Standard Academic Fee Heads</h3>
-            <p className="text-xs text-slate-500">
-              Configure base amounts for academic year 2026-2027. Waivers calculate automatically based on rules.
-            </p>
+        <div className="space-y-4">
+          {/* Dedicated Sub-Tab Bar to switch between 1st and 2nd Year fees */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-2 pr-1">
+                Select Year:
+              </span>
+              <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-lg border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingHead(null);
+                    setFeeYearTab(1);
+                  }}
+                  className={`py-2 px-5 rounded-md text-xs font-bold transition flex items-center gap-2 ${
+                    feeYearTab === 1
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                  }`}
+                >
+                  <GraduationCap className="w-4 h-4" />
+                  1st Year Fees (MBA-I)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingHead(null);
+                    setFeeYearTab(2);
+                  }}
+                  className={`py-2 px-5 rounded-md text-xs font-bold transition flex items-center gap-2 ${
+                    feeYearTab === 2
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                  }`}
+                >
+                  <GraduationCap className="w-4 h-4" />
+                  2nd Year Fees (MBA-II)
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pr-3 text-xs">
+              <span className="text-slate-500 font-medium">
+                Total {feeYearTab === 1 ? '1st Year' : '2nd Year'} Base Fee:
+              </span>
+              <span className="font-mono font-bold text-sm text-blue-900 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
+                ₹{feeHeads
+                  .filter(h => (h.year_of_study || 1) === feeYearTab)
+                  .reduce((acc, h) => acc + Number(h.base_amount || 0), 0)
+                  .toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-500 font-semibold border-b">
-                <tr>
-                  <th className="px-4 py-3">Fee Head Name</th>
-                  <th className="px-4 py-3">Code</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3 text-right">Base Amount (₹)</th>
-                  <th className="px-4 py-3 text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-medium">
-                {feeHeads.map((head) => (
-                  <tr key={head.id} className="hover:bg-slate-50/60">
-                    <td className="px-4 py-3 font-bold text-slate-900">{head.name}</td>
-                    <td className="px-4 py-3 font-mono text-slate-500">{head.code}</td>
-                    <td className="px-4 py-3">
-                      {head.allows_waiver ? (
-                        <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                          Waiver Eligible (Girls/SC/ST/EBC)
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-bold">
-                          Compulsory (All Students)
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono font-bold text-slate-800">
-                      {editingHead?.id === head.id ? (
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={headAmount}
-                          onChange={(e) => setHeadAmount(e.target.value)}
-                          className="w-32 px-2 py-1 border rounded text-right font-mono text-xs focus:ring-1 focus:ring-blue-600"
-                        />
-                      ) : (
-                        `₹${Number(head.base_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {editingHead?.id === head.id ? (
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => handleUpdateFeeHead(head)}
-                            className="px-2 py-1 bg-blue-600 text-white rounded text-[10px] font-semibold"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => setEditingHead(null)}
-                            className="px-2 py-1 bg-slate-200 text-slate-700 rounded text-[10px]"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setEditingHead(head);
-                            setHeadAmount(String(head.base_amount));
-                          }}
-                          className="text-blue-600 hover:text-blue-800 font-semibold"
-                        >
-                          Edit Base Fee
-                        </button>
-                      )}
-                    </td>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
+            <div className="border-b pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Standard Academic Fee Heads — {feeYearTab === 1 ? '1st Year (MBA-I)' : '2nd Year (MBA-II)'}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Configure base amounts for {feeYearTab === 1 ? '1st Year (MBA-I)' : '2nd Year (MBA-II)'} (Academic Year 2026-2027). Waivers calculate automatically based on rules.
+                </p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-500 font-semibold border-b">
+                  <tr>
+                    <th className="px-4 py-3">Fee Head Name</th>
+                    <th className="px-4 py-3">Code</th>
+                    <th className="px-4 py-3">Type</th>
+                    <th className="px-4 py-3 text-right">Base Amount (₹)</th>
+                    <th className="px-4 py-3 text-center">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium">
+                  {feeHeads
+                    .filter(h => (h.year_of_study || 1) === feeYearTab)
+                    .map((head) => (
+                    <tr key={head.id} className="hover:bg-slate-50/60">
+                      <td className="px-4 py-3 font-bold text-slate-900">{head.name}</td>
+                      <td className="px-4 py-3 font-mono text-slate-500">{head.code}</td>
+                      <td className="px-4 py-3">
+                        {head.allows_waiver ? (
+                          <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                            Waiver Eligible (Girls/SC/ST/EBC)
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-bold">
+                            Compulsory (All Students)
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono font-bold text-slate-800">
+                        {editingHead?.id === head.id ? (
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={headAmount}
+                            onChange={(e) => setHeadAmount(e.target.value)}
+                            className="w-32 px-2 py-1 border rounded text-right font-mono text-xs focus:ring-1 focus:ring-blue-600"
+                          />
+                        ) : (
+                          `₹${Number(head.base_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {editingHead?.id === head.id ? (
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => handleUpdateFeeHead(head)}
+                              className="px-2 py-1 bg-blue-600 text-white rounded text-[10px] font-semibold"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingHead(null)}
+                              className="px-2 py-1 bg-slate-200 text-slate-700 rounded text-[10px]"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setEditingHead(head);
+                              setHeadAmount(String(head.base_amount));
+                            }}
+                            className="text-blue-600 hover:text-blue-800 font-semibold"
+                          >
+                            Edit Base Fee
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
           {/* 1.2 FEE CONCESSION TYPES & WAIVER MATRIX */}
           <div className="pt-6 border-t border-slate-200 space-y-4">
@@ -829,9 +895,9 @@ export default function Settings({ user }) {
                     {/* Breakdown across fee heads */}
                     <div className="bg-white p-2.5 rounded-lg border border-slate-200/80 space-y-1.5 text-[11px]">
                       <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                        Configured Waivers by Fee Head:
+                        Configured Waivers ({feeYearTab === 1 ? '1st Year' : '2nd Year'}):
                       </div>
-                      {feeHeads.map(h => {
+                      {feeHeads.filter(h => (h.year_of_study || 1) === feeYearTab).map(h => {
                         const rule = (t.rules || []).find(r => r.fee_head_id === h.id);
                         const pct = rule ? Number(rule.waiver_percent) : 0;
                         const amt = rule ? Number(rule.waiver_amount) : 0;
@@ -857,6 +923,7 @@ export default function Settings({ user }) {
             </div>
           </div>
         </div>
+      </div>
       )}
 
       {/* 2. OFFLINE BACKUPS */}
@@ -1340,11 +1407,42 @@ export default function Settings({ user }) {
 
               {/* Fee Heads Waiver Rules Matrix */}
               <div className="pt-2">
-                <label className="block font-bold text-slate-800 mb-2 uppercase text-[11px] tracking-wider">
-                  Fee Heads Waiver & Concession Matrix:
-                </label>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2 pb-2 border-b border-slate-200">
+                  <label className="block font-bold text-slate-800 uppercase text-[11px] tracking-wider">
+                    Fee Heads Waiver Matrix:
+                  </label>
+                  <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-lg border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setModalYearTab(1)}
+                      className={`px-3 py-1 rounded text-xs font-bold transition flex items-center gap-1.5 ${
+                        modalYearTab === 1
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <GraduationCap className="w-3.5 h-3.5" />
+                      1st Year Heads (MBA-I)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setModalYearTab(2)}
+                      className={`px-3 py-1 rounded text-xs font-bold transition flex items-center gap-1.5 ${
+                        modalYearTab === 2
+                          ? 'bg-purple-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <GraduationCap className="w-3.5 h-3.5" />
+                      2nd Year Heads (MBA-II)
+                    </button>
+                  </div>
+                </div>
+
                 <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100">
-                  {feeHeads.map((head) => {
+                  {feeHeads
+                    .filter((head) => (head.year_of_study || 1) === modalYearTab)
+                    .map((head) => {
                     const rule = typeHeadRules[head.id] || { waiver_percent: '0', waiver_amount: '0', reason: '' };
                     const baseAmt = Number(head.base_amount);
                     const pct = Number(rule.waiver_percent) || 0;

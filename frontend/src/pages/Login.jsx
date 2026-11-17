@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
-import { ShieldCheck, Lock, User, WifiOff, ArrowRight, UserCheck, KeyRound } from 'lucide-react';
+import { ShieldCheck, Lock, User, WifiOff, ArrowRight, UserCheck, KeyRound, Clock } from 'lucide-react';
 import collegeLogo from '../assets/college_logo_sm.png';
 
-export default function Login({ onLoginSuccess }) {
+export default function Login({ onLoginSuccess, inactivityNotice }) {
   const [isConfigured, setIsConfigured] = useState(true);
   const [checkingSetup, setCheckingSetup] = useState(true);
 
@@ -147,6 +147,13 @@ export default function Login({ onLoginSuccess }) {
         </div>
 
         <div className="p-8">
+          {inactivityNotice && !error && (
+            <div className="mb-4 p-3.5 bg-amber-50 border border-amber-300 text-amber-900 text-xs rounded-xl font-medium flex items-center gap-2.5 shadow-xs">
+              <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>{inactivityNotice}</span>
+            </div>
+          )}
+
           {error && (
             <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-lg font-medium">
               {error}

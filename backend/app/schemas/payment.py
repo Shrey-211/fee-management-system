@@ -89,6 +89,7 @@ class PaymentResponse(BaseModel):
     student_category: Optional[str] = None
     student_course: Optional[str] = None
     student_academic_year: Optional[str] = None
+    student_current_year: Optional[int] = 1
     payment_date: date
     entry_date: date
     payment_mode: str

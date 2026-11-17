@@ -8,9 +8,10 @@ class FeeHead(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)  # Tuition, Development, Dress code, Exam, Other
-    code = Column(String(50), unique=True, index=True, nullable=False)
+    code = Column(String(50), index=True, nullable=False)
     base_amount = Column(Numeric(10, 2), nullable=False, default=0.0)
     academic_year = Column(String(20), nullable=False, default="2026-2027")
+    year_of_study = Column(Integer, nullable=False, default=1)  # 1 for 1st Year (MBA-I), 2 for 2nd Year (MBA-II)
     is_compulsory = Column(Boolean, default=True)  # True for dress, exam, other
     allows_waiver = Column(Boolean, default=True)  # True for tuition, development
 

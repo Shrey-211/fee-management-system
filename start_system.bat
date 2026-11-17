@@ -7,7 +7,7 @@ echo                    Mr. Shrikant's Office Station
 echo ===================================================================
 if exist "dist\FeeManagementSystem\FeeManagementSystem.exe" (
     echo Starting compiled standalone application...
-    start "" "dist\FeeManagementSystem\FeeManagementSystem.exe"
+    start "" /d "%~dp0dist\FeeManagementSystem" "dist\FeeManagementSystem\FeeManagementSystem.exe"
 ) else (
     echo Starting local service via Python...
     python entrypoint.py

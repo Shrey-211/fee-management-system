@@ -71,15 +71,32 @@ def seed_database(seed_samples: bool = False):
                 db.delete(s)
             db.commit()
 
-        # 2. Seed Fee Heads
+        # 2. Seed Fee Heads (1st Year & 2nd Year)
+        # Safe SQLite column check for year_of_study in fee_heads
+        try:
+            from sqlalchemy import text
+            fh_cols = [r[1] for r in db.execute(text("PRAGMA table_info(fee_heads)")).fetchall()]
+            if fh_cols and "year_of_study" not in fh_cols:
+                db.execute(text("ALTER TABLE fee_heads ADD COLUMN year_of_study INTEGER NOT NULL DEFAULT 1"))
+                db.commit()
+            # Drop legacy single-column unique index on code if present, replaced by composite
+            idx_list = [r[1] for r in db.execute(text("PRAGMA index_list(fee_heads)")).fetchall()]
+            if "ix_fee_heads_code" in idx_list:
+                db.execute(text("DROP INDEX IF EXISTS ix_fee_heads_code"))
+                db.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_fee_heads_code_year ON fee_heads(code, year_of_study, academic_year)"))
+                db.commit()
+        except Exception as e:
+            print(f"Fee head schema check notice: {e}")
+
         if db.query(FeeHead).count() == 0:
-            print("Seeding standard fee heads...")
+            print("Seeding standard 1st Year fee heads...")
             fee_heads = [
                 FeeHead(
                     name="Tuition Fee",
                     code="TUITION",
                     base_amount=Decimal("40000.00"),
                     academic_year="2026-2027",
+                    year_of_study=1,
                     is_compulsory=True,
                     allows_waiver=True
                 ),
@@ -88,6 +105,7 @@ def seed_database(seed_samples: bool = False):
                     code="DEVELOPMENT",
                     base_amount=Decimal("15000.00"),
                     academic_year="2026-2027",
+                    year_of_study=1,
                     is_compulsory=True,
                     allows_waiver=True
                 ),
@@ -96,6 +114,7 @@ def seed_database(seed_samples: bool = False):
                     code="DRESS_CODE",
                     base_amount=Decimal("3000.00"),
                     academic_year="2026-2027",
+                    year_of_study=1,
                     is_compulsory=True,
                     allows_waiver=False
                 ),
@@ -104,6 +123,7 @@ def seed_database(seed_samples: bool = False):
                     code="EXAM",
                     base_amount=Decimal("2000.00"),
                     academic_year="2026-2027",
+                    year_of_study=1,
                     is_compulsory=True,
                     allows_waiver=False
                 ),
@@ -112,13 +132,44 @@ def seed_database(seed_samples: bool = False):
                     code="OTHER",
                     base_amount=Decimal("1000.00"),
                     academic_year="2026-2027",
+                    year_of_study=1,
                     is_compulsory=True,
                     allows_waiver=False
                 )
             ]
             db.add_all(fee_heads)
             db.commit()
-            print("Standard fee heads seeded.")
+            print("Standard 1st Year fee heads seeded.")
+
+        # Ensure 2nd Year standard fee heads exist (identical types to 1st Year, editable later)
+        y2_specs = [
+            ("Tuition Fee", "TUITION", Decimal("40000.00"), True, True),
+            ("Development Fee", "DEVELOPMENT", Decimal("15000.00"), True, True),
+            ("Dress Code Fee", "DRESS_CODE", Decimal("3000.00"), True, False),
+            ("University Examination Fee", "EXAM", Decimal("2000.00"), True, False),
+            ("Other Charges (Send-off, Welcome, Party)", "OTHER", Decimal("1000.00"), True, False),
+        ]
+        for name, code, base_amt, is_comp, allows_w in y2_specs:
+            existing_y2 = db.query(FeeHead).filter(
+                FeeHead.year_of_study == 2,
+                FeeHead.code == code
+            ).first()
+            if existing_y2:
+                if existing_y2.name != name:
+                    existing_y2.name = name
+                    db.commit()
+            else:
+                new_y2 = FeeHead(
+                    name=name,
+                    code=code,
+                    base_amount=base_amt,
+                    academic_year="2026-2027",
+                    year_of_study=2,
+                    is_compulsory=is_comp,
+                    allows_waiver=allows_w
+                )
+                db.add(new_y2)
+                db.commit()
 
         # Safe SQLite column check for concession_type_id and scholarship fields
         try:
@@ -336,6 +387,28 @@ def seed_database(seed_samples: bool = False):
             )
             db.commit()
             print("Standard fee concession types and head waiver rules seeded.")
+
+        # Ensure head rules exist for all fee heads across all concession types
+        all_types = db.query(FeeConcessionType).all()
+        all_heads = db.query(FeeHead).all()
+        for ctype in all_types:
+            existing_head_ids = {r.fee_head_id for r in ctype.head_rules}
+            code_rules = {}
+            for r in ctype.head_rules:
+                if r.fee_head:
+                    code_rules[r.fee_head.code] = (r.waiver_percent, r.waiver_amount, r.reason)
+            for h in all_heads:
+                if h.id not in existing_head_ids:
+                    pct, amt, reason = code_rules.get(h.code, (Decimal("0.00"), Decimal("0.00"), None))
+                    new_rule = FeeTypeHeadRule(
+                        concession_type_id=ctype.id,
+                        fee_head_id=h.id,
+                        waiver_percent=pct,
+                        waiver_amount=amt,
+                        reason=reason
+                    )
+                    db.add(new_rule)
+        db.commit()
 
         # 3. Seed Default Email Template
         if db.query(EmailTemplate).count() == 0:

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { 
   ArrowLeft, Receipt, Plus, AlertCircle, 
-  Mail, Award, CheckCircle, Clock, FileText, Phone, MapPin, Edit3, X, Trash2, Printer 
+  Mail, Award, CheckCircle, Clock, FileText, Phone, MapPin, Edit3, X, Trash2, Printer, GraduationCap 
 } from 'lucide-react';
 import ModalDialog from '../components/ModalDialog';
 import ReceiptModal from '../components/ReceiptModal';
@@ -21,6 +21,7 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
   const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '', type: 'info' });
   const [receiptModal, setReceiptModal] = useState({ isOpen: false, payment: null });
   const [statementModal, setStatementModal] = useState(false);
+  const [promoteModal, setPromoteModal] = useState({ isOpen: false, loading: false });
 
   // Edit Profile Modal
   const [showEditModal, setShowEditModal] = useState(false);
@@ -98,12 +99,24 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
       return;
     }
 
+    const trimmedMobile = (editForm.mobile_number || '').trim();
+    if (!trimmedMobile) {
+      setEditError('Mobile / Phone Number (*) is compulsory. Please fill in this field.');
+      return;
+    }
+    const cleanDigits = trimmedMobile.replace(/\D/g, '');
+    if (cleanDigits.length < 10) {
+      setEditError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
     const payload = {
       ...editForm,
       full_name: trimmedName,
       academic_year: (editForm.academic_year || '2026-2027').trim(),
+      current_year: editForm.current_year ? parseInt(editForm.current_year) : 1,
       concession_type_id: editForm.concession_type_id ? parseInt(editForm.concession_type_id) : null,
-      mobile_number: (editForm.mobile_number || '').trim() || null,
+      mobile_number: trimmedMobile,
       email_address: (editForm.email_address || '').trim() || null,
       address: (editForm.address || '').trim() || null,
       course_branch: (editForm.course_branch || 'MBA').trim()
@@ -118,6 +131,23 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
       setEditError(err.message || 'Failed to update student profile.');
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  const handlePromoteConfirm = async () => {
+    setPromoteModal(prev => ({ ...prev, loading: true }));
+    try {
+      await api.promoteStudent(student.id);
+      setPromoteModal({ isOpen: false, loading: false });
+      loadStudent();
+    } catch (err) {
+      setAlertModal({
+        isOpen: true,
+        type: 'danger',
+        title: 'Promotion Failed',
+        message: err.message || 'Failed to promote student.'
+      });
+      setPromoteModal(prev => ({ ...prev, loading: false }));
     }
   };
 
@@ -350,6 +380,17 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
         </button>
 
         <div className="flex items-center gap-2">
+          {student.current_year === 1 && (
+            <button
+              onClick={() => setPromoteModal({ isOpen: true, loading: false })}
+              className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow transition"
+              title="Promote to 2nd Year (MBA-II)"
+            >
+              <GraduationCap className="w-3.5 h-3.5" />
+              Promote to 2nd Year
+            </button>
+          )}
+
           <button
             onClick={handleOpenEdit}
             className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-slate-300 shadow-sm transition"
@@ -409,6 +450,15 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
           <div>
             <div className="flex items-center gap-3">
               <h2 className="text-xl font-black text-slate-900">{student.full_name}</h2>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                student.current_year === 2 
+                  ? 'bg-purple-100 text-purple-800 border border-purple-200' 
+                  : student.current_year === 1 
+                  ? 'bg-blue-100 text-blue-800 border border-blue-200' 
+                  : 'bg-slate-100 text-slate-800 border border-slate-300'
+              }`}>
+                {student.current_year === 2 ? '2nd Year (MBA-II)' : student.current_year === 1 ? '1st Year (MBA-I)' : 'Passed Out'}
+              </span>
               <span className="text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
                 {student.category}
               </span>
@@ -462,6 +512,17 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
                 ₹{Number(student.total_fee_paid).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </p>
             </div>
+            {Number(student.year_1_dues || 0) > 0 && student.current_year >= 2 && (
+              <div className="bg-amber-50/70 border border-amber-200 px-3 py-1.5 rounded-xl">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-amber-800">1st Year Arrears</p>
+                <p className="text-base font-black text-amber-900 font-mono">
+                  ₹{Number(student.year_1_dues).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </p>
+                <span className="inline-block text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-amber-200 text-amber-900">
+                  Unpaid from 1st Year
+                </span>
+              </div>
+            )}
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Net Outstanding Due</p>
               <p className={`text-xl font-black font-mono ${Number(student.overall_balance) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
@@ -503,6 +564,7 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
             <thead className="bg-slate-50/50 text-slate-500 font-semibold border-b border-slate-200">
               <tr>
                 <th className="px-4 py-2.5">Fee Head Name</th>
+                <th className="px-4 py-2.5 text-center">Class / Year</th>
                 <th className="px-4 py-2.5 text-right">Base Amount</th>
                 <th className="px-4 py-2.5 text-center">Waiver %</th>
                 <th className="px-4 py-2.5">Waiver Scheme Reason</th>
@@ -512,41 +574,62 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
-              {student.fee_heads.map((h) => (
-                <tr key={h.id} className="hover:bg-slate-50/60">
-                  <td className="px-4 py-3 font-bold text-slate-800">{h.name}</td>
-                  <td className="px-4 py-3 text-right font-mono text-slate-600">
-                    ₹{Number(h.base_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {Number(h.discount_percent) > 0 ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                        {Number(h.discount_percent)}% OFF
+              {student.fee_heads.map((h) => {
+                const isArrear = h.is_first_year_arrear || (h.year_of_study === 1 && Number(h.balance) > 0 && student.current_year >= 2);
+                return (
+                  <tr key={h.id} className={`hover:bg-slate-50/60 ${isArrear ? 'bg-amber-50/20' : ''}`}>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-800">{h.name}</span>
+                        {isArrear && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300">
+                            Unpaid from 1st Year
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        h.year_of_study === 2
+                          ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                          : 'bg-blue-100 text-blue-800 border border-blue-200'
+                      }`}>
+                        {h.year_of_study === 2 ? '2nd Year' : '1st Year'}
                       </span>
-                    ) : (
-                      <span className="text-slate-400 text-[11px]">0%</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-slate-600 italic">
-                    {h.waiver_reason || 'Standard Fee'}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono font-bold text-slate-800">
-                    ₹{Number(h.net_due).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono text-emerald-700 font-semibold">
-                    ₹{Number(h.paid_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono font-extrabold">
-                    {Number(h.balance) > 0 ? (
-                      <span className="text-rose-600">
-                        ₹{Number(h.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </span>
-                    ) : (
-                      <span className="text-emerald-600">₹0.00</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono text-slate-600">
+                      ₹{Number(h.base_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {Number(h.discount_percent) > 0 ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          {Number(h.discount_percent)}% OFF
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-[11px]">0%</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600 italic">
+                      {h.waiver_reason || 'Standard Fee'}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono font-bold text-slate-800">
+                      ₹{Number(h.net_due).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono text-emerald-700 font-semibold">
+                      ₹{Number(h.paid_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono font-extrabold">
+                      {Number(h.balance) > 0 ? (
+                        <span className="text-rose-600">
+                          ₹{Number(h.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </span>
+                      ) : (
+                        <span className="text-emerald-600">₹0.00</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -894,6 +977,19 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
                 </div>
 
                 <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Class / Year of Study *</label>
+                  <select
+                    value={editForm.current_year || 1}
+                    onChange={(e) => setEditForm({ ...editForm, current_year: parseInt(e.target.value) })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 bg-white font-semibold"
+                  >
+                    <option value={1}>1st Year (MBA-I)</option>
+                    <option value={2}>2nd Year (MBA-II)</option>
+                    <option value={3}>Passed Out / Alum</option>
+                  </select>
+                </div>
+
+                <div>
                   <label className="block font-semibold text-slate-700 mb-1">Gender *</label>
                   <select
                     value={editForm.gender}
@@ -958,12 +1054,16 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Mobile Number</label>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Mobile / Phone Number *
+                  </label>
                   <input
                     type="tel"
+                    required
+                    placeholder="10-digit mobile number"
                     value={editForm.mobile_number}
                     onChange={(e) => setEditForm({ ...editForm, mobile_number: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 font-medium"
                   />
                 </div>
 
@@ -1405,6 +1505,75 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
         student={student}
         onClose={() => setStatementModal(false)}
       />
+
+      {/* Promote to 2nd Year Modal */}
+      {promoteModal.isOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 bg-purple-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <GraduationCap className="w-5 h-5 text-purple-300" />
+                <h3 className="text-sm font-bold">Promote Student to 2nd Year</h3>
+              </div>
+              <button
+                onClick={() => setPromoteModal({ isOpen: false, loading: false })}
+                className="text-purple-300 hover:text-white p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs">
+              <p className="text-slate-700 font-medium">
+                You are promoting <strong className="text-slate-900">{student.full_name}</strong> ({student.student_code}) from <strong>1st Year (MBA-I)</strong> to <strong>2nd Year (MBA-II)</strong>.
+              </p>
+
+              {Number(student.overall_balance) > 0 ? (
+                <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-900">
+                  <strong className="block font-bold mb-1 flex items-center gap-1.5 text-amber-950">
+                    <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+                    Unpaid 1st Year Dues: ₹{Number(student.overall_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </strong>
+                  <span>
+                    These outstanding dues will safely carry forward into 2nd Year marked with the <strong className="underline decoration-amber-500">[Unpaid from 1st Year]</strong> tag and can be cleared at any time.
+                  </span>
+                </div>
+              ) : (
+                <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-900 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>1st Year Fees are 100% cleared! Student enters 2nd Year with zero arrears.</span>
+                </div>
+              )}
+
+              <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl text-purple-900 text-[11px] leading-relaxed">
+                <strong className="block font-bold mb-0.5 text-purple-950">Promotion Summary:</strong>
+                • Advance student from <strong>1st Year (MBA-I)</strong> to <strong>2nd Year (MBA-II)</strong>.<br />
+                • Standard 2nd Year fee heads will be assigned to their ledger.<br />
+                • All 1st Year payment receipts and ledger statements remain safely preserved in their history.
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => setPromoteModal({ isOpen: false, loading: false })}
+                  className="px-4 py-2 border rounded-lg font-semibold text-slate-700 hover:bg-slate-100 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={promoteModal.loading}
+                  onClick={handlePromoteConfirm}
+                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold shadow transition flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <GraduationCap className="w-4 h-4" />
+                  {promoteModal.loading ? 'Promoting...' : 'Confirm Promotion to 2nd Year'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

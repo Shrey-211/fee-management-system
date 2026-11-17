@@ -7,6 +7,7 @@ class FeeHeadBase(BaseModel):
     code: str
     base_amount: Decimal = Field(default=Decimal("0.00"), ge=0)
     academic_year: str = "2026-2027"
+    year_of_study: int = Field(default=1, ge=1, le=2)
     is_compulsory: bool = True
     allows_waiver: bool = True
 
@@ -24,6 +25,7 @@ class FeeHeadUpdate(BaseModel):
     name: Optional[str] = None
     base_amount: Optional[Decimal] = None
     academic_year: Optional[str] = None
+    year_of_study: Optional[int] = None
     is_compulsory: Optional[bool] = None
     allows_waiver: Optional[bool] = None
 
@@ -45,6 +47,8 @@ class StudentFeeHeadResponse(BaseModel):
     paid_amount: Decimal
     balance: Decimal
     waiver_reason: Optional[str] = None
+    year_of_study: int = 1
+    is_first_year_arrear: bool = False
 
     class Config:
         from_attributes = True

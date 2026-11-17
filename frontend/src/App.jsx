@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import Login from './pages/Login';
@@ -12,7 +12,7 @@ import Reports from './pages/Reports';
 import Reminders from './pages/Reminders';
 import Settings from './pages/Settings';
 import { api } from './api/client';
-import { X, KeyRound } from 'lucide-react';
+import { X, KeyRound, Clock } from 'lucide-react';
 import ModalDialog from './components/ModalDialog';
 
 export default function App() {
@@ -21,6 +21,12 @@ export default function App() {
   const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [studentForPayment, setStudentForPayment] = useState(null);
   const [studentForFine, setStudentForFine] = useState(null);
+
+  // Inactivity Auto-Logout State
+  const [inactivityNotice, setInactivityNotice] = useState('');
+  const [showInactivityModal, setShowInactivityModal] = useState(false);
+  const [countdownSeconds, setCountdownSeconds] = useState(60);
+  const lastActivityRef = useRef(Date.now());
 
   // Logout Confirm State
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -49,11 +55,77 @@ export default function App() {
 
   const handleLogout = () => {
     setShowLogoutConfirm(false);
+    setShowInactivityModal(false);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
     setTab('dashboard');
+    setInactivityNotice('');
   };
+
+  const handleStaySignedIn = () => {
+    lastActivityRef.current = Date.now();
+    setShowInactivityModal(false);
+  };
+
+  // 15-Minute Inactivity Auto-Logout with 60-Second Warning
+  useEffect(() => {
+    if (!user) return;
+
+    lastActivityRef.current = Date.now();
+
+    const INACTIVITY_LIMIT_MS = 15 * 60 * 1000; // 15 mins total
+    const WARNING_THRESHOLD_MS = 14 * 60 * 1000; // 14 mins (triggers 60s warning)
+
+    let lastThrottle = Date.now();
+    const handleUserActivity = (e) => {
+      // If warning modal is active, passive mouse movements don't dismiss it to avoid mouse jitter
+      if (showInactivityModal && e.type === 'mousemove') {
+        return;
+      }
+      const now = Date.now();
+      if (now - lastThrottle > 1000) {
+        lastThrottle = now;
+        lastActivityRef.current = now;
+        if (showInactivityModal) {
+          setShowInactivityModal(false);
+        }
+      }
+    };
+
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'wheel'];
+    events.forEach((evt) => window.addEventListener(evt, handleUserActivity, { passive: true }));
+
+    const timer = setInterval(() => {
+      const now = Date.now();
+      const elapsed = now - lastActivityRef.current;
+
+      if (elapsed >= INACTIVITY_LIMIT_MS) {
+        // Auto-logout
+        setShowInactivityModal(false);
+        setShowLogoutConfirm(false);
+        setShowPwdModal(false);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setUser(null);
+        setTab('dashboard');
+        setInactivityNotice('You have been automatically logged out due to 15 minutes of inactivity.');
+      } else if (elapsed >= WARNING_THRESHOLD_MS) {
+        const remaining = Math.max(0, Math.ceil((INACTIVITY_LIMIT_MS - elapsed) / 1000));
+        setCountdownSeconds(remaining);
+        setShowInactivityModal(true);
+      } else {
+        if (showInactivityModal) {
+          setShowInactivityModal(false);
+        }
+      }
+    }, 1000);
+
+    return () => {
+      events.forEach((evt) => window.removeEventListener(evt, handleUserActivity));
+      clearInterval(timer);
+    };
+  }, [user, showInactivityModal]);
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
@@ -92,7 +164,15 @@ export default function App() {
   };
 
   if (!user) {
-    return <Login onLoginSuccess={(u) => setUser(u)} />;
+    return (
+      <Login
+        onLoginSuccess={(u) => {
+          setUser(u);
+          setInactivityNotice('');
+        }}
+        inactivityNotice={inactivityNotice}
+      />
+    );
   }
 
   return (
@@ -107,7 +187,7 @@ export default function App() {
         }}
       />
 
-      <div className="flex-1 flex max-w-7xl w-full mx-auto">
+      <div className="flex-1 flex w-full">
         <Sidebar
           currentTab={tab}
           setTab={(t) => {
@@ -117,7 +197,7 @@ export default function App() {
           user={user}
         />
 
-        <main className="flex-1 p-6 overflow-y-auto">
+        <main className="flex-1 p-4 sm:p-6 overflow-y-auto min-w-0">
           {tab === 'dashboard' && (
             <Dashboard
               setTab={setTab}
@@ -267,6 +347,52 @@ export default function App() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Inactivity Warning Modal (60-second warning) */}
+      {showInactivityModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">
+            <div className="p-4 bg-amber-500 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-amber-100 animate-pulse" />
+                <h3 className="text-sm font-bold tracking-tight">Session Inactivity Warning</h3>
+              </div>
+            </div>
+
+            <div className="p-6 text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-amber-50 border-2 border-amber-300 flex items-center justify-center mx-auto text-amber-600 shadow-inner">
+                <span className="font-mono text-2xl font-black">{countdownSeconds}s</span>
+              </div>
+
+              <div className="space-y-1">
+                <h4 className="font-bold text-slate-800 text-base">Are you still there?</h4>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  No activity has been detected for 14 minutes. For security, you will be automatically signed out in{' '}
+                  <span className="font-bold text-amber-600 font-mono">{countdownSeconds} seconds</span>.
+                </p>
+              </div>
+
+              <div className="pt-2 flex items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                >
+                  Sign Out Now
+                </button>
+                <button
+                  type="button"
+                  autoFocus
+                  onClick={handleStaySignedIn}
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow transition flex items-center gap-1.5"
+                >
+                  Stay Signed In
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

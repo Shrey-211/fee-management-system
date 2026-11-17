@@ -89,7 +89,8 @@ def generate_daily_collection_report(
     report_date: Optional[date] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
-    academic_year: Optional[str] = None
+    academic_year: Optional[str] = None,
+    year_of_study: Optional[int] = None
 ) -> Dict[str, Any]:
     query = db.query(Payment)
     if report_date:
@@ -99,6 +100,9 @@ def generate_daily_collection_report(
             query = query.filter(Payment.payment_date >= start_date)
         if end_date:
             query = query.filter(Payment.payment_date <= end_date)
+
+    if year_of_study:
+        query = query.join(Student).filter(Student.current_year == year_of_study)
 
     payments = query.order_by(Payment.payment_date.asc(), Payment.id.asc()).all()
     fee_heads = db.query(FeeHead).all()
@@ -137,6 +141,7 @@ def generate_daily_collection_report(
             "physical_receipt_no": p.physical_receipt_no,
             "student_name": student.full_name if student else "N/A",
             "student_code": student.student_code if student else "N/A",
+            "student_current_year": student.current_year if student else 1,
             "category": student.category if student else "N/A",
             "payment_mode": p.payment_mode,
             "payment_date": str(p.payment_date),
@@ -162,24 +167,33 @@ def generate_daily_collection_report(
     }
 
 
-def export_daily_collection_excel(db: Session, start_date: date, end_date: date) -> io.BytesIO:
-    report_data = generate_daily_collection_report(db, start_date=start_date, end_date=end_date)
+def export_daily_collection_excel(
+    db: Session,
+    start_date: date,
+    end_date: date,
+    year_of_study: Optional[int] = None
+) -> io.BytesIO:
+    report_data = generate_daily_collection_report(
+        db, start_date=start_date, end_date=end_date, year_of_study=year_of_study
+    )
     wb = Workbook()
     ws = wb.active
     ws.title = "Daily Collection Report"
+
+    yr_label = f"{year_of_study}st Year" if year_of_study == 1 else f"{year_of_study}nd Year" if year_of_study == 2 else "All Years"
 
     # College Title Header at the top
     header_row = add_college_excel_header(
         ws,
         report_title="Daily Fee Collection Report",
-        subtitle=f"Period: {start_date} to {end_date} | Phaltan, Maharashtra | Generated: {date.today()}",
-        end_col="H"
+        subtitle=f"Period: {start_date} to {end_date} | Year: {yr_label} | Phaltan, Maharashtra | Generated: {date.today()}",
+        end_col="I"
     )
 
     # Table Headers at Row 6
     headers = [
         "Receipt Date", "System Receipt #", "Manual Receipt #", "Student ID", 
-        "Student Name", "Category", "Payment Mode", "Amount (₹)"
+        "Student Name", "Year", "Category", "Payment Mode", "Amount (₹)"
     ]
     for c_idx, h in enumerate(headers, 1):
         ws.cell(row=header_row, column=c_idx, value=h)
@@ -193,6 +207,7 @@ def export_daily_collection_excel(db: Session, start_date: date, end_date: date)
             item["physical_receipt_no"],
             item["student_code"],
             item["student_name"],
+            "2nd Year" if item.get("student_current_year") == 2 else "1st Year",
             item["category"],
             item["payment_mode"],
             item["total_amount"]
@@ -200,17 +215,17 @@ def export_daily_collection_excel(db: Session, start_date: date, end_date: date)
         for c_idx, val in enumerate(row_vals, 1):
             ws.cell(row=row_idx, column=c_idx, value=val)
         style_row(ws[row_idx], font=NORMAL_FONT)
-        ws[f"H{row_idx}"].number_format = "#,##0.00"
+        ws[f"I{row_idx}"].number_format = "#,##0.00"
         row_idx += 1
 
     # Total Row
     total_vals = [
-        "TOTAL", "", "", "", "", "", "", report_data["total_collected"]
+        "TOTAL", "", "", "", "", "", "", "", report_data["total_collected"]
     ]
     for c_idx, val in enumerate(total_vals, 1):
         ws.cell(row=row_idx, column=c_idx, value=val)
     style_row(ws[row_idx], fill=TOTAL_FILL, font=BOLD_FONT)
-    ws[f"H{row_idx}"].number_format = "#,##0.00"
+    ws[f"I{row_idx}"].number_format = "#,##0.00"
 
     # Auto-adjust column widths
     for col_idx, col in enumerate(ws.columns, 1):
@@ -224,7 +239,11 @@ def export_daily_collection_excel(db: Session, start_date: date, end_date: date)
     return output
 
 
-def export_outstanding_dues_excel(db: Session, academic_year: Optional[str] = None) -> io.BytesIO:
+def export_outstanding_dues_excel(
+    db: Session,
+    academic_year: Optional[str] = None,
+    year_of_study: Optional[int] = None
+) -> io.BytesIO:
     query = db.query(Student).filter(Student.is_active == True)
     if academic_year:
         clean_ay = academic_year.replace("20", "").strip()
@@ -233,22 +252,27 @@ def export_outstanding_dues_excel(db: Session, academic_year: Optional[str] = No
             (Student.academic_year == clean_ay) |
             (Student.academic_year.like(f"%{clean_ay}%"))
         )
+    if year_of_study:
+        query = query.filter(Student.current_year == year_of_study)
+
     students = query.order_by(Student.full_name.asc()).all()
     wb = Workbook()
     ws = wb.active
     ws.title = "Outstanding Fee Balances"
 
+    yr_label = f"{year_of_study}st Year" if year_of_study == 1 else f"{year_of_study}nd Year" if year_of_study == 2 else "All Years"
+
     # College Title Header at the top
     header_row = add_college_excel_header(
         ws,
         report_title="Student Outstanding Balances Report",
-        subtitle=f"Academic Year: {academic_year or 'All Years'} | Includes Applicable Waivers & Fines | Phaltan, Maharashtra | Generated: {date.today()}",
-        end_col="K"
+        subtitle=f"Academic Year: {academic_year or 'All'} | Class: {yr_label} | Includes Applicable Waivers & Fines | Phaltan, Maharashtra | Generated: {date.today()}",
+        end_col="M"
     )
 
     headers = [
-        "Student Code", "Student Name", "Gender", "Category", "Mobile",
-        "Applicable Fee (₹)", "Fee Paid (₹)", "Fee Balance (₹)", 
+        "Student Code", "Student Name", "Year", "Gender", "Category", "Mobile",
+        "Applicable Fee (₹)", "Fee Paid (₹)", "Fee Balance (₹)", "1st Yr Arrears (₹)",
         "Fines Total (₹)", "Fines Paid (₹)", "Net Total Due (₹)"
     ]
     for c_idx, h in enumerate(headers, 1):
@@ -259,6 +283,7 @@ def export_outstanding_dues_excel(db: Session, academic_year: Optional[str] = No
     tot_fee = Decimal("0.00")
     tot_paid = Decimal("0.00")
     tot_fee_bal = Decimal("0.00")
+    tot_y1_bal = Decimal("0.00")
     tot_fines = Decimal("0.00")
     tot_fines_paid = Decimal("0.00")
     tot_overall_due = Decimal("0.00")
@@ -268,6 +293,11 @@ def export_outstanding_dues_excel(db: Session, academic_year: Optional[str] = No
         applicable = sum([quantize_amount(h.net_due) for h in s.fee_heads], Decimal("0.00"))
         fee_paid = sum([quantize_amount(h.paid_amount) for h in s.fee_heads], Decimal("0.00"))
         fee_bal = sum([quantize_amount(h.balance) for h in s.fee_heads], Decimal("0.00"))
+
+        # Year 1 arrears (if student in 2nd year or beyond)
+        y1_bal = Decimal("0.00")
+        if s.current_year >= 2:
+            y1_bal = sum([quantize_amount(h.balance) for h in s.fee_heads if getattr(h.fee_head, 'year_of_study', 1) == 1], Decimal("0.00"))
 
         # Fines
         active_fines = [f for f in s.fines if f.status != "WAIVED"]
@@ -280,31 +310,34 @@ def export_outstanding_dues_excel(db: Session, academic_year: Optional[str] = No
         tot_fee += applicable
         tot_paid += fee_paid
         tot_fee_bal += fee_bal
+        tot_y1_bal += y1_bal
         tot_fines += fines_amt
         tot_fines_paid += fines_p
         tot_overall_due += net_due
 
+        yr_str = "2nd Year" if s.current_year == 2 else "1st Year" if s.current_year == 1 else "Passed Out"
+
         row_vals = [
-            s.student_code, s.full_name, s.gender, s.category, s.mobile_number or "N/A",
-            float(applicable), float(fee_paid), float(fee_bal),
+            s.student_code, s.full_name, yr_str, s.gender, s.category, s.mobile_number or "N/A",
+            float(applicable), float(fee_paid), float(fee_bal), float(y1_bal),
             float(fines_amt), float(fines_p), float(net_due)
         ]
         for c_idx, val in enumerate(row_vals, 1):
             ws.cell(row=row_idx, column=c_idx, value=val)
         style_row(ws[row_idx], font=NORMAL_FONT)
-        for c in ["F", "G", "H", "I", "J", "K"]:
+        for c in ["G", "H", "I", "J", "K", "L", "M"]:
             ws[f"{c}{row_idx}"].number_format = "#,##0.00"
         row_idx += 1
 
     total_vals = [
-        "TOTAL", "", "", "", "",
-        float(tot_fee), float(tot_paid), float(tot_fee_bal),
+        "TOTAL", "", "", "", "", "",
+        float(tot_fee), float(tot_paid), float(tot_fee_bal), float(tot_y1_bal),
         float(tot_fines), float(tot_fines_paid), float(tot_overall_due)
     ]
     for c_idx, val in enumerate(total_vals, 1):
         ws.cell(row=row_idx, column=c_idx, value=val)
     style_row(ws[row_idx], fill=TOTAL_FILL, font=BOLD_FONT)
-    for c in ["F", "G", "H", "I", "J", "K"]:
+    for c in ["G", "H", "I", "J", "K", "L", "M"]:
         ws[f"{c}{row_idx}"].number_format = "#,##0.00"
 
     for col_idx, col in enumerate(ws.columns, 1):
