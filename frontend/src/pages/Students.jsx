@@ -287,10 +287,10 @@ export default function Students({ onSelectStudent, onRecordPayment, user }) {
   ]));
 
   return (
-    <div className="space-y-4">
+    <div className="flex-1 flex flex-col min-h-0 h-full space-y-3">
       {/* Delete Success Alert Banner */}
       {deleteSuccessMsg && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center justify-between font-medium animate-in fade-in duration-200 shadow-xs">
+        <div className="shrink-0 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center justify-between font-medium animate-in fade-in duration-200 shadow-xs">
           <div className="flex items-center gap-2">
             <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{deleteSuccessMsg}</span>
@@ -306,23 +306,23 @@ export default function Students({ onSelectStudent, onRecordPayment, user }) {
       )}
 
       {/* Search and Action Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex-1 w-full flex flex-wrap items-center gap-3">
+      <div className="shrink-0 bg-white p-3 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+        <div className="flex-1 w-full flex flex-wrap items-center gap-2.5">
           <div className="relative flex-1 min-w-[200px]">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
               placeholder="Search by student name or phone..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
+              className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
             />
           </div>
 
           <select
             value={academicYearFilter}
             onChange={(e) => setAcademicYearFilter(e.target.value)}
-            className="py-2 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
+            className="py-1.5 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
           >
             <option value="">All Academic Years</option>
             {availableAcademicYears.map(ay => (
@@ -333,7 +333,7 @@ export default function Students({ onSelectStudent, onRecordPayment, user }) {
           <select
             value={yearFilter}
             onChange={(e) => setYearFilter(e.target.value)}
-            className="py-2 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white font-semibold text-slate-800"
+            className="py-1.5 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white font-semibold text-slate-800"
           >
             <option value="">All Years (1st & 2nd)</option>
             <option value="1">1st Year (MBA-I)</option>
@@ -344,7 +344,7 @@ export default function Students({ onSelectStudent, onRecordPayment, user }) {
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="py-2 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
+            className="py-1.5 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
           >
             <option value="">All Categories</option>
             <option value="OPEN">OPEN</option>
@@ -358,7 +358,7 @@ export default function Students({ onSelectStudent, onRecordPayment, user }) {
           <select
             value={gender}
             onChange={(e) => setGender(e.target.value)}
-            className="py-2 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
+            className="py-1.5 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
           >
             <option value="">All Genders</option>
             <option value="MALE">Male</option>
@@ -368,7 +368,7 @@ export default function Students({ onSelectStudent, onRecordPayment, user }) {
           <select
             value={scholarshipStatusFilter}
             onChange={(e) => setScholarshipStatusFilter(e.target.value)}
-            className="py-2 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
+            className="py-1.5 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
           >
             <option value="">All Scholarships</option>
             <option value="RECEIVED">Fully Received</option>
@@ -390,30 +390,31 @@ export default function Students({ onSelectStudent, onRecordPayment, user }) {
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="w-full md:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow"
+          className="w-full md:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow shrink-0"
         >
           <Plus className="w-4 h-4" />
           Enroll New Student
         </button>
       </div>
 
-      {/* Student List Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+      {/* Student List Table Card Container - fits screen size and handles inner scroll */}
+      <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+        {/* Scrollable table viewport: handles both horizontal and vertical scrolling inside container */}
+        <div className="flex-1 min-h-0 overflow-auto">
+          <table className="w-full text-left text-xs min-w-[1280px] border-separate border-spacing-0">
+            <thead>
               <tr>
-                <th className="px-4 py-3 whitespace-nowrap">Full Name</th>
-                <th className="px-4 py-3 whitespace-nowrap">Year</th>
-                <th className="px-4 py-3 whitespace-nowrap">Academic Year</th>
-                <th className="px-4 py-3 whitespace-nowrap">Gender</th>
-                <th className="px-4 py-3 whitespace-nowrap">Category</th>
-                <th className="px-4 py-3 whitespace-nowrap">Govt Scholarship</th>
-                <th className="px-4 py-3 text-right whitespace-nowrap">Applicable Fee</th>
-                <th className="px-4 py-3 text-right whitespace-nowrap">Paid Amount</th>
-                <th className="px-4 py-3 text-right whitespace-nowrap">Fines Due</th>
-                <th className="px-4 py-3 text-right whitespace-nowrap">Net Due</th>
-                <th className="px-4 py-3 text-center whitespace-nowrap">Action</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 uppercase tracking-wider font-bold border-b border-slate-300 px-4 py-3 whitespace-nowrap">Full Name</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 uppercase tracking-wider font-bold border-b border-slate-300 px-4 py-3 whitespace-nowrap">Year</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 uppercase tracking-wider font-bold border-b border-slate-300 px-4 py-3 whitespace-nowrap">Academic Year</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 uppercase tracking-wider font-bold border-b border-slate-300 px-4 py-3 whitespace-nowrap">Gender</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 uppercase tracking-wider font-bold border-b border-slate-300 px-4 py-3 whitespace-nowrap">Category</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 uppercase tracking-wider font-bold border-b border-slate-300 px-4 py-3 whitespace-nowrap">Govt Scholarship</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 uppercase tracking-wider font-bold border-b border-slate-300 px-4 py-3 text-right whitespace-nowrap">Applicable Fee</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 uppercase tracking-wider font-bold border-b border-slate-300 px-4 py-3 text-right whitespace-nowrap">Paid Amount</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 uppercase tracking-wider font-bold border-b border-slate-300 px-4 py-3 text-right whitespace-nowrap">Fines Due</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 uppercase tracking-wider font-bold border-b border-slate-300 px-4 py-3 text-right whitespace-nowrap">Net Due</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 uppercase tracking-wider font-bold border-b border-slate-300 px-4 py-3 text-center whitespace-nowrap min-w-[170px]">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
@@ -530,7 +531,7 @@ export default function Students({ onSelectStudent, onRecordPayment, user }) {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-center whitespace-nowrap">
+                    <td className="px-4 py-3 text-center whitespace-nowrap min-w-[170px]">
                       <div className="flex items-center justify-center gap-1.5">
                         {s.current_year === 1 && (
                           <button
@@ -575,6 +576,21 @@ export default function Students({ onSelectStudent, onRecordPayment, user }) {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Bottom Status Bar: Always visible on screen with count and horizontal scroll indicator */}
+        <div className="shrink-0 px-4 py-2 bg-slate-50/90 border-t border-slate-200 text-[11px] text-slate-500 flex flex-wrap items-center justify-between gap-2 select-none">
+          <div className="flex items-center gap-2">
+            <span>Total Listed: <strong className="text-slate-800 font-semibold">{students.length}</strong> students</span>
+            {yearFilter && (
+              <span className="text-slate-500 font-normal">
+                (Filtered: {yearFilter === '1' ? '1st Year' : yearFilter === '2' ? '2nd Year' : 'Passed Out'})
+              </span>
+            )}
+          </div>
+          <span className="text-slate-400 text-[10.5px]">
+            ↔ Scroll horizontally to view more columns or Action buttons
+          </span>
         </div>
       </div>
 

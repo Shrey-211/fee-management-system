@@ -314,25 +314,25 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
   });
 
   return (
-    <div className="space-y-4">
+    <div className="flex-1 flex flex-col min-h-0 h-full space-y-3">
       {/* Top Filter and Entry Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex-1 w-full flex flex-wrap items-center gap-3">
+      <div className="shrink-0 bg-white p-3 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+        <div className="flex-1 w-full flex flex-wrap items-center gap-2.5">
           <div className="relative flex-1 min-w-[220px]">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
               placeholder="Filter by manual receipt #, student name, or ID..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
+              className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
             />
           </div>
 
           <select
             value={paymentMode}
             onChange={(e) => setPaymentMode(e.target.value)}
-            className="py-2 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
+            className="py-1.5 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
           >
             <option value="">All Payment Modes</option>
             <option value="CASH">Cash Only</option>
@@ -350,27 +350,27 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
             setSelectedStudentDetail(null);
             setShowModal(true);
           }}
-          className="w-full md:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow"
+          className="w-full md:w-auto px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-xs shrink-0"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-3.5 h-3.5" />
           Enter Physical Receipt
         </button>
       </div>
 
-      {/* Payments History Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+      {/* Payments History Table Card */}
+      <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-auto">
+          <table className="w-full text-left text-xs border-separate border-spacing-0">
+            <thead className="bg-slate-100 text-slate-700 uppercase tracking-wider font-semibold sticky top-0 z-10 shadow-xs">
               <tr>
-                <th className="px-4 py-3">Receipt Date</th>
-                <th className="px-4 py-3">Manual Receipt #</th>
-                <th className="px-4 py-3">System #</th>
-                <th className="px-4 py-3">Student Particulars</th>
-                <th className="px-4 py-3">Mode</th>
-                <th className="px-4 py-3">Fee Head Breakdown</th>
-                <th className="px-4 py-3 text-right">Total Amount Received</th>
-                <th className="px-4 py-3 text-center">Action</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200">Receipt Date</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200">Manual Receipt #</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200">System #</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200">Student Particulars</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200">Mode</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200">Fee Head Breakdown</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200 text-right">Total Amount Received</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
@@ -456,6 +456,18 @@ export default function Payments({ initialStudent, onClearInitialStudent, onSele
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Pinned Bottom Status Bar */}
+        <div className="shrink-0 px-4 py-2 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-600">
+          <div className="flex items-center gap-2">
+            <span>Showing <strong>{filteredPayments.length}</strong> of <strong>{payments.length}</strong> receipts</span>
+            {paymentMode && <span className="text-[11px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-semibold">Mode: {paymentMode}</span>}
+            {search && <span className="text-[11px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-semibold">Search: "{search}"</span>}
+          </div>
+          <div className="text-xs font-medium">
+            Total Collection: <strong className="text-emerald-700 font-mono font-bold">₹{filteredPayments.reduce((sum, p) => sum + Number(p.total_amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
+          </div>
         </div>
       </div>
 

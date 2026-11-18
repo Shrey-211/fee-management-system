@@ -37,7 +37,7 @@ export default function Sidebar({ currentTab, setTab, user }) {
     <aside 
       className={`${
         collapsed ? 'w-16 p-2' : 'w-64 p-4'
-      } bg-white border-r border-slate-200 min-h-[calc(100vh-4rem)] flex flex-col justify-between shrink-0 transition-all duration-200 ease-in-out select-none`}
+      } bg-white border-r border-slate-200 h-full flex flex-col justify-between shrink-0 transition-all duration-200 ease-in-out select-none overflow-y-auto`}
     >
       <div className="space-y-1">
         {/* Collapse Header / Toggle */}

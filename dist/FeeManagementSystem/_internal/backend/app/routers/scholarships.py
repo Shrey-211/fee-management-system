@@ -2,6 +2,8 @@ from typing import List, Optional
 from datetime import date
 from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from ..database import get_db
@@ -18,6 +20,7 @@ from ..schemas.scholarship import (
 from ..auth import get_current_user, require_accountant_or_admin
 from ..services.fee_engine import quantize_amount, recalculate_student_balances
 from ..services.audit_service import log_audit
+from ..services.report_service import export_scholarships_excel
 
 
 router = APIRouter(prefix="/api/scholarships", tags=["Scholarships"])
@@ -296,6 +299,45 @@ def mark_scholarship_received(
     db.refresh(sc)
     return serialize_scholarship(sc)
 
+
+class ScholarshipExportRequest(BaseModel):
+    status: Optional[str] = None
+    search: Optional[str] = None
+    ids: Optional[List[int]] = None
+
+
+@router.get("/export/excel")
+def download_scholarships_excel(
+    status: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Download scholarships report as formatted Excel workbook."""
+    excel_stream = export_scholarships_excel(db, status=status, search=search)
+    filename = f"scholarships_report_{date.today().strftime('%Y%m%d')}.xlsx"
+    return StreamingResponse(
+        excel_stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@router.post("/export/excel")
+def download_scholarships_excel_post(
+    req: ScholarshipExportRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Download filtered scholarships as formatted Excel workbook (supports exact visible IDs)."""
+    excel_stream = export_scholarships_excel(db, status=req.status, search=req.search, ids=req.ids)
+    filename = f"scholarships_report_{date.today().strftime('%Y%m%d')}.xlsx"
+    return StreamingResponse(
+        excel_stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 @router.put("/{scholarship_id}/mark-pending", response_model=ScholarshipCreditResponse)
 def mark_scholarship_pending(
     scholarship_id: int,
@@ -336,6 +378,7 @@ def mark_scholarship_pending(
     recalculate_student_balances(sc.student_id, db)
     db.refresh(sc)
     return serialize_scholarship(sc)
+
 
 @router.delete("/{scholarship_id}/disbursements/{disbursement_id}", response_model=ScholarshipCreditResponse)
 def delete_scholarship_disbursement(
@@ -401,6 +444,45 @@ def delete_scholarship_disbursement(
     recalculate_student_balances(sc.student_id, db)
     db.refresh(sc)
     return serialize_scholarship(sc)
+
+
+class ScholarshipExportRequest(BaseModel):
+    status: Optional[str] = None
+    search: Optional[str] = None
+    ids: Optional[List[int]] = None
+
+
+@router.get("/export/excel")
+def download_scholarships_excel(
+    status: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Download scholarships report as formatted Excel workbook."""
+    excel_stream = export_scholarships_excel(db, status=status, search=search)
+    filename = f"scholarships_report_{date.today().strftime('%Y%m%d')}.xlsx"
+    return StreamingResponse(
+        excel_stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@router.post("/export/excel")
+def download_scholarships_excel_post(
+    req: ScholarshipExportRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Download filtered scholarships as formatted Excel workbook (supports exact visible IDs)."""
+    excel_stream = export_scholarships_excel(db, status=req.status, search=req.search, ids=req.ids)
+    filename = f"scholarships_report_{date.today().strftime('%Y%m%d')}.xlsx"
+    return StreamingResponse(
+        excel_stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 

@@ -252,6 +252,20 @@ export const api = {
   deleteScholarshipDisbursement: (scholarshipId, disbursementId) => request(`/scholarships/${scholarshipId}/disbursements/${disbursementId}`, {
     method: 'DELETE'
   }),
+  downloadScholarshipsExcel: async (params = {}) => {
+    const blob = await request('/scholarships/export/excel', {
+      method: 'POST',
+      body: JSON.stringify(params)
+    });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `scholarships_report_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+  },
 
   // Reports
   getDailyReport: (params = {}) => {

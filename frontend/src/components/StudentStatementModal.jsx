@@ -89,7 +89,7 @@ export default function StudentStatementModal({ isOpen, student, onClose }) {
                 Approved by AICTE New Delhi, DTE Mumbai & Affiliated to Shivaji University, Kolhapur
               </p>
               <p className="text-[10px] text-slate-500 mt-0.5">
-                Phaltan, Dist. Satara - 415523 (Maharashtra) | Phone: (02166) 221233
+                Phaltan, Dist. Satara - 415523 (Maharashtra)
               </p>
             </div>
           </div>

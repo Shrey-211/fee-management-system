@@ -139,23 +139,29 @@ def build():
         print(f"Compiling Windows Installer using Inno Setup ({iscc})...")
         res_iss = subprocess.run([str(iscc), "/Q", str(root / "installer.iss")], cwd=root)
         if res_iss.returncode == 0:
-            setup_exe = releases_dir / "FeeManagementSystem_Setup_v1.1.0.exe"
-            root_setup = root / "FeeManagementSystem_Setup_v1.1.0.exe"
-            v110_exe = root / "v1.1.0.exe"
-            releases_v110_exe = releases_dir / "v1.1.0.exe"
+            setup_exe = releases_dir / "FeeManagementSystem_1.1.0.exe"
+            root_setup = root / "FeeManagementSystem_1.1.0.exe"
+
+            # Remove any previous or other build exe files
+            for old_exe in list(root.glob("*.exe")) + list(releases_dir.glob("*.exe")):
+                if old_exe.resolve() not in [setup_exe.resolve(), root_setup.resolve()]:
+                    try:
+                        old_exe.unlink()
+                        print(f"Removed previous installer: {old_exe.name}")
+                    except Exception as e:
+                        print(f"Could not remove {old_exe.name}: {e}")
+
             try:
                 shutil.copy2(setup_exe, root_setup)
-                shutil.copy2(setup_exe, v110_exe)
-                shutil.copy2(setup_exe, releases_v110_exe)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Could not copy to root: {e}")
+
             print(f"Windows Setup Installer ready: {setup_exe} ({round(setup_exe.stat().st_size / (1024*1024), 2)} MB)")
-            print(f"Direct Alias ready: {v110_exe}")
+            print(f"Root installer ready: {root_setup}")
 
     print("\n=======================================================")
     print(" BUILD & PACKAGING COMPLETE!")
-    print(f" Setup Installer (.exe): FeeManagementSystem_Setup_v1.1.0.exe")
-    print(f" Direct Named Installer: v1.1.0.exe")
+    print(f" Setup Installer (.exe): FeeManagementSystem_1.1.0.exe")
     print(f" Standalone App Folder:  dist/FeeManagementSystem/FeeManagementSystem.exe")
     print(f" Release Zip:            releases/FeeManagementSystem-v1.1.0-windows.zip")
     print("=======================================================")

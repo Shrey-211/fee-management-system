@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { 
   Award, Plus, Search, X, CheckCircle, Clock, AlertCircle, 
-  RefreshCw, FileText, History, Trash2, ArrowRight 
+  RefreshCw, FileText, History, Trash2, ArrowRight, Download 
 } from 'lucide-react';
 import StudentSelect from '../components/StudentSelect';
 import ModalDialog from '../components/ModalDialog';
@@ -12,6 +12,7 @@ export default function Scholarships() {
   const [students, setStudents] = useState([]);
   const [feeHeads, setFeeHeads] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, NOT_RECEIVED, PARTIALLY_RECEIVED, RECEIVED
   const [showModal, setShowModal] = useState(false);
@@ -268,70 +269,89 @@ export default function Scholarships() {
 
   const remDue = receiveTarget ? getRemDue(receiveTarget) : 0;
 
+  const handleExportExcel = async () => {
+    setExporting(true);
+    try {
+      await api.downloadScholarshipsExcel({
+        status: statusFilter,
+        search: search.trim() || null,
+        ids: filteredScholarships.map(s => s.id)
+      });
+    } catch (err) {
+      setAlertModal({
+        isOpen: true,
+        title: 'Export Failed',
+        message: err.message || 'Failed to generate Excel report.'
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="flex-1 flex flex-col min-h-0 h-full space-y-3">
       {/* Top Banner & KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="shrink-0 grid grid-cols-1 md:grid-cols-3 gap-3">
         {/* Total Claims */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Govt Claims</p>
-            <p className="text-xl font-bold text-slate-900 mt-1 font-mono">
+            <p className="text-xl font-bold text-slate-900 mt-0.5 font-mono">
               ₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </p>
             <p className="text-[11px] text-slate-400 mt-0.5">{scholarships.length} student claims enrolled</p>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+          <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
             <Award className="w-5 h-5" />
           </div>
         </div>
 
         {/* Received to Date */}
-        <div className="bg-white p-4 rounded-xl border border-emerald-200 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-3.5 rounded-xl border border-emerald-200 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider flex items-center gap-1">
               <CheckCircle className="w-3.5 h-3.5" /> Received From Government
             </p>
-            <p className="text-xl font-bold text-emerald-700 mt-1 font-mono">
+            <p className="text-xl font-bold text-emerald-700 mt-0.5 font-mono">
               ₹{receivedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </p>
             <p className="text-[11px] text-emerald-600 font-medium mt-0.5">
               {receivedScholarships.length} fully settled, {partialScholarships.length} in progress
             </p>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
             <CheckCircle className="w-5 h-5" />
           </div>
         </div>
 
         {/* Remaining Due */}
-        <div className="bg-white p-4 rounded-xl border border-amber-200 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-3.5 rounded-xl border border-amber-200 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider flex items-center gap-1">
               <Clock className="w-3.5 h-3.5" /> Remaining Balance Due
             </p>
-            <p className="text-xl font-bold text-amber-700 mt-1 font-mono">
+            <p className="text-xl font-bold text-amber-700 mt-0.5 font-mono">
               ₹{remainingAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </p>
             <p className="text-[11px] text-amber-600 font-medium mt-0.5">
               {pendingScholarships.length + partialScholarships.length} claims awaiting remaining steps
             </p>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+          <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
             <AlertCircle className="w-5 h-5" />
           </div>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="shrink-0 bg-white p-3 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
         {/* Status Filter Tabs */}
         <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg w-full md:w-auto">
           <button
             onClick={() => setStatusFilter('ALL')}
             className={`px-3 py-1.5 rounded-md text-xs font-semibold transition ${
               statusFilter === 'ALL'
-                ? 'bg-white text-slate-900 shadow-sm'
+                ? 'bg-white text-slate-900 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -341,7 +361,7 @@ export default function Scholarships() {
             onClick={() => setStatusFilter('NOT_RECEIVED')}
             className={`px-3 py-1.5 rounded-md text-xs font-semibold transition flex items-center gap-1.5 ${
               statusFilter === 'NOT_RECEIVED'
-                ? 'bg-amber-500 text-white shadow-sm'
+                ? 'bg-amber-500 text-white shadow-xs'
                 : 'text-amber-700 hover:bg-amber-100/60'
             }`}
           >
@@ -352,7 +372,7 @@ export default function Scholarships() {
             onClick={() => setStatusFilter('PARTIALLY_RECEIVED')}
             className={`px-3 py-1.5 rounded-md text-xs font-semibold transition flex items-center gap-1.5 ${
               statusFilter === 'PARTIALLY_RECEIVED'
-                ? 'bg-blue-600 text-white shadow-sm'
+                ? 'bg-blue-600 text-white shadow-xs'
                 : 'text-blue-700 hover:bg-blue-100/60'
             }`}
           >
@@ -363,7 +383,7 @@ export default function Scholarships() {
             onClick={() => setStatusFilter('RECEIVED')}
             className={`px-3 py-1.5 rounded-md text-xs font-semibold transition flex items-center gap-1.5 ${
               statusFilter === 'RECEIVED'
-                ? 'bg-emerald-600 text-white shadow-sm'
+                ? 'bg-emerald-600 text-white shadow-xs'
                 : 'text-emerald-700 hover:bg-emerald-100/60'
             }`}
           >
@@ -372,7 +392,7 @@ export default function Scholarships() {
           </button>
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto flex-1 max-w-md justify-end">
+        <div className="flex items-center gap-2.5 w-full md:w-auto flex-1 max-w-lg justify-end">
           <div className="relative flex-1">
             <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
             <input
@@ -380,37 +400,47 @@ export default function Scholarships() {
               placeholder="Search by student name or scheme..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none bg-white"
+              className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none bg-white"
             />
           </div>
 
           <button
-            onClick={() => setShowModal(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow shrink-0"
+            onClick={handleExportExcel}
+            disabled={exporting || filteredScholarships.length === 0}
+            className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow-xs shrink-0 disabled:opacity-50"
+            title="Export filtered scholarship claims to Excel"
           >
-            <Plus className="w-4 h-4" />
+            <Download className="w-3.5 h-3.5" />
+            {exporting ? 'Exporting...' : 'Export to Excel'}
+          </button>
+
+          <button
+            onClick={() => setShowModal(true)}
+            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow-xs shrink-0"
+          >
+            <Plus className="w-3.5 h-3.5" />
             Add Manual Claim
           </button>
         </div>
       </div>
 
-      {/* Scholarships Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+      {/* Scholarships Table Card */}
+      <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-auto">
+          <table className="w-full text-left text-xs border-separate border-spacing-0">
+            <thead className="bg-slate-100 text-slate-700 uppercase tracking-wider font-semibold sticky top-0 z-10 shadow-xs">
               <tr>
-                <th className="px-4 py-3">Student Name</th>
-                <th className="px-4 py-3">Academic Year</th>
-                <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3">Fee Head</th>
-                <th className="px-4 py-3">Scholarship Scheme</th>
-                <th className="px-4 py-3 text-right">Sanctioned (₹)</th>
-                <th className="px-4 py-3 text-right">Received (₹)</th>
-                <th className="px-4 py-3 text-right font-bold">Remaining Due (₹)</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Sanction Order #</th>
-                <th className="px-4 py-3 text-center">Action</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200">Student Name</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200">Academic Year</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200">Category</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200">Fee Head</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200">Scholarship Scheme</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200 text-right">Sanctioned (₹)</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200 text-right">Received (₹)</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200 text-right font-bold">Remaining Due (₹)</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200">Status</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200">Sanction Order #</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
@@ -527,6 +557,19 @@ export default function Scholarships() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Pinned Bottom Status Bar */}
+        <div className="shrink-0 px-4 py-2 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-600">
+          <div className="flex items-center gap-2">
+            <span>Showing <strong>{filteredScholarships.length}</strong> of <strong>{scholarships.length}</strong> claims</span>
+            {statusFilter !== 'ALL' && <span className="text-[11px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-semibold">Status: {statusFilter}</span>}
+            {search && <span className="text-[11px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-semibold">Search: "{search}"</span>}
+          </div>
+          <div className="flex items-center gap-4 text-xs font-medium">
+            <span>Remaining Due: <strong className="text-amber-700 font-mono font-bold">₹{filteredScholarships.reduce((sum, s) => sum + getRemDue(s), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></span>
+            <span>Received: <strong className="text-emerald-700 font-mono font-bold">₹{filteredScholarships.reduce((sum, s) => sum + Number(s.received_amount || (s.status === 'RECEIVED' ? s.amount : 0)), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></span>
+          </div>
         </div>
       </div>
 

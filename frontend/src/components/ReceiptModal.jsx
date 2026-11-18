@@ -72,7 +72,7 @@ function ReceiptSingleCopy({
             Approved by AICTE New Delhi, DTE Mumbai & Affiliated to Shivaji University, Kolhapur
           </p>
           <p className="text-[7.5px] text-slate-500 mt-0.5 leading-tight">
-            Phaltan, Dist. Satara - 415523 (Maharashtra) | Phone: (02166) 221233
+            Phaltan, Dist. Satara - 415523 (Maharashtra) 
           </p>
         </div>
       </div>

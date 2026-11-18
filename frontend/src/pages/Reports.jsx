@@ -91,12 +91,12 @@ export default function Reports({ onSelectStudent }) {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="flex-1 flex flex-col min-h-0 h-full space-y-3">
       {/* Report Switcher Tabs */}
-      <div className="flex border-b border-slate-200">
+      <div className="shrink-0 flex border-b border-slate-200 bg-white rounded-t-xl px-2">
         <button
           onClick={() => setActiveReport('daily')}
-          className={`py-3 px-6 text-xs font-bold border-b-2 transition flex items-center gap-2 ${
+          className={`py-2.5 px-5 text-xs font-bold border-b-2 transition flex items-center gap-2 ${
             activeReport === 'daily'
               ? 'border-blue-600 text-blue-700 bg-blue-50/40'
               : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -108,7 +108,7 @@ export default function Reports({ onSelectStudent }) {
 
         <button
           onClick={() => setActiveReport('outstanding')}
-          className={`py-3 px-6 text-xs font-bold border-b-2 transition flex items-center gap-2 ${
+          className={`py-2.5 px-5 text-xs font-bold border-b-2 transition flex items-center gap-2 ${
             activeReport === 'outstanding'
               ? 'border-blue-600 text-blue-700 bg-blue-50/40'
               : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -121,14 +121,14 @@ export default function Reports({ onSelectStudent }) {
 
       {/* DAILY / DATE-RANGE REPORT VIEW */}
       {activeReport === 'daily' && (
-        <div className="space-y-4">
+        <div className="flex-1 flex flex-col min-h-0 space-y-2.5">
           {/* Official College Report Header */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
+          <div className="shrink-0 bg-white p-3 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
               <img
                 src={collegeLogo}
                 alt="College Logo"
-                className="w-12 h-12 object-contain rounded-lg p-0.5 border border-slate-200 bg-slate-50 shrink-0"
+                className="w-10 h-10 object-contain rounded-lg p-0.5 border border-slate-200 bg-slate-50 shrink-0"
               />
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
@@ -144,57 +144,57 @@ export default function Reports({ onSelectStudent }) {
             </div>
             <button
               onClick={() => window.print()}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition border border-slate-300 self-end sm:self-auto"
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition border border-slate-300 self-end sm:self-auto shrink-0"
             >
               <Printer className="w-3.5 h-3.5 text-slate-600" />
               Print Preview
             </button>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-              <div className="flex items-center gap-2 text-xs">
-                <span className="font-semibold text-slate-600">From Date:</span>
+          <div className="shrink-0 bg-white p-3 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="font-semibold text-slate-600">From:</span>
                 <input
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="px-3 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-600"
+                  className="px-2.5 py-1 border rounded-lg focus:ring-2 focus:ring-blue-600 text-xs"
                 />
               </div>
 
-              <div className="flex items-center gap-2 text-xs">
-                <span className="font-semibold text-slate-600">To Date:</span>
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="font-semibold text-slate-600">To:</span>
                 <input
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="px-3 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-600"
+                  className="px-2.5 py-1 border rounded-lg focus:ring-2 focus:ring-blue-600 text-xs"
                 />
               </div>
 
-              <div className="flex items-center gap-2 text-xs">
-                <span className="font-semibold text-slate-600">Year / Class:</span>
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="font-semibold text-slate-600">Class:</span>
                 <select
                   value={yearFilter}
                   onChange={(e) => setYearFilter(e.target.value)}
-                  className="px-3 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-600 bg-white font-semibold text-slate-800"
+                  className="px-2.5 py-1 border rounded-lg focus:ring-2 focus:ring-blue-600 bg-white font-semibold text-slate-800 text-xs"
                 >
-                  <option value="">Both Years (All)</option>
-                  <option value="1">1st Year Only (MBA-I)</option>
-                  <option value="2">2nd Year Only (MBA-II)</option>
+                  <option value="">Both Years</option>
+                  <option value="1">1st Year (MBA-I)</option>
+                  <option value="2">2nd Year (MBA-II)</option>
                 </select>
               </div>
 
               {/* Quick Range Presets */}
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1">
                 <button
                   onClick={() => {
                     const today = new Date().toISOString().split('T')[0];
                     setStartDate(today);
                     setEndDate(today);
                   }}
-                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium rounded border"
+                  className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium rounded border"
                 >
                   Today
                 </button>
@@ -204,7 +204,7 @@ export default function Reports({ onSelectStudent }) {
                     setStartDate(`${y}-07-01`);
                     setEndDate(`${y}-10-31`);
                   }}
-                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium rounded border"
+                  className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium rounded border"
                 >
                   July – Oct 31
                 </button>
@@ -213,9 +213,9 @@ export default function Reports({ onSelectStudent }) {
 
             <button
               onClick={handleDownloadDailyExcel}
-              className="w-full md:w-auto px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow transition"
+              className="w-full md:w-auto px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition shrink-0"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-3.5 h-3.5" />
               Download Excel Workbook (.xlsx)
             </button>
           </div>
@@ -223,50 +223,50 @@ export default function Reports({ onSelectStudent }) {
           {dailyData && (
             <>
               {/* Report Summary Cards */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+              <div className="shrink-0 grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Period Collections</span>
-                  <p className="text-xl font-black text-slate-900 font-mono mt-1">
+                  <p className="text-lg font-black text-slate-900 font-mono mt-0.5">
                     ₹{Number(dailyData.total_collected).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </p>
-                  <p className="text-[10px] text-slate-500 mt-1">{dailyData.payments_count} Receipts</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">{dailyData.payments_count} Receipts</p>
                 </div>
 
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Cash Collections</span>
-                  <p className="text-xl font-black text-blue-700 font-mono mt-1">
+                  <p className="text-lg font-black text-blue-700 font-mono mt-0.5">
                     ₹{Number(dailyData.cash_collected).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </p>
-                  <p className="text-[10px] text-slate-500 mt-1">Physical counter cash</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Physical counter cash</p>
                 </div>
 
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Digital / Online Modes</span>
-                  <p className="text-xl font-black text-purple-700 font-mono mt-1">
+                  <p className="text-lg font-black text-purple-700 font-mono mt-0.5">
                     ₹{Number(dailyData.other_modes_collected).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </p>
-                  <p className="text-[10px] text-slate-500 mt-1">UPI, Cheque, NEFT</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">UPI, Cheque, NEFT</p>
                 </div>
 
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Event Fines Part</span>
-                  <p className="text-xl font-black text-amber-700 font-mono mt-1">
+                  <p className="text-lg font-black text-amber-700 font-mono mt-0.5">
                     ₹{Number(dailyData.fines_total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </p>
-                  <p className="text-[10px] text-slate-500 mt-1">Absence fines collected</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Absence fines collected</p>
                 </div>
               </div>
 
               {/* Fee Head Breakdown Summary Bar */}
-              <div className="bg-slate-900 text-white p-4 rounded-xl shadow">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+              <div className="shrink-0 bg-slate-900 text-white p-3 rounded-xl shadow-xs">
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                   Collections Breakdown by Fee Head
                 </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 text-xs">
                   {Object.entries(dailyData.fee_head_totals || {}).map(([headName, amt]) => (
-                    <div key={headName} className="p-2.5 bg-slate-800/80 rounded-lg border border-slate-700">
-                      <span className="text-slate-400 text-[11px] block truncate">{headName}</span>
-                      <span className="font-mono font-bold text-sm text-slate-100">
+                    <div key={headName} className="p-2 bg-slate-800/80 rounded-lg border border-slate-700">
+                      <span className="text-slate-400 text-[10px] block truncate">{headName}</span>
+                      <span className="font-mono font-bold text-xs text-slate-100">
                         ₹{Number(amt).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
@@ -274,17 +274,17 @@ export default function Reports({ onSelectStudent }) {
                 </div>
               </div>
 
-              {/* Detailed Itemized Table */}
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="p-3 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3">
+              {/* Detailed Itemized Table Card */}
+              <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col overflow-hidden">
+                <div className="shrink-0 p-2.5 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-2.5">
                   <div className="relative flex-1 w-full max-w-sm">
-                    <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-2 text-slate-400" />
                     <input
                       type="text"
                       placeholder="Filter records by student name, ID, or receipt #..."
                       value={dailySearch}
                       onChange={(e) => setDailySearch(e.target.value)}
-                      className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none bg-white"
+                      className="w-full pl-9 pr-3 py-1 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none bg-white"
                     />
                   </div>
                   <span className="text-[11px] text-slate-500 font-medium shrink-0 self-end sm:self-center">
@@ -292,19 +292,19 @@ export default function Reports({ onSelectStudent }) {
                   </span>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+                <div className="flex-1 min-h-0 overflow-auto">
+                  <table className="w-full text-left text-xs border-separate border-spacing-0">
+                    <thead className="bg-slate-100 text-slate-700 uppercase tracking-wider font-semibold sticky top-0 z-10 shadow-xs">
                       <tr>
-                        <th className="px-4 py-3">Receipt Date</th>
-                        <th className="px-4 py-3">System #</th>
-                        <th className="px-4 py-3">Manual Book #</th>
-                        <th className="px-4 py-3">Student Name</th>
-                        <th className="px-4 py-3">ID Code</th>
-                        <th className="px-4 py-3 text-center">Class / Year</th>
-                        <th className="px-4 py-3">Category</th>
-                        <th className="px-4 py-3">Mode</th>
-                        <th className="px-4 py-3 text-right">Amount (₹)</th>
+                        <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-2.5 border-b border-slate-200">Receipt Date</th>
+                        <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-2.5 border-b border-slate-200">System #</th>
+                        <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-2.5 border-b border-slate-200">Manual Book #</th>
+                        <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-2.5 border-b border-slate-200">Student Name</th>
+                        <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-2.5 border-b border-slate-200">ID Code</th>
+                        <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-2.5 border-b border-slate-200 text-center">Class / Year</th>
+                        <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-2.5 border-b border-slate-200">Category</th>
+                        <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-2.5 border-b border-slate-200">Mode</th>
+                        <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-2.5 border-b border-slate-200 text-right">Amount (₹)</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-medium">
@@ -323,12 +323,12 @@ export default function Reports({ onSelectStudent }) {
                       ) : (
                         filteredDailyItems.map((item) => (
                           <tr key={item.payment_id} className="hover:bg-slate-50/80">
-                            <td className="px-4 py-3 text-slate-600">{item.payment_date}</td>
-                            <td className="px-4 py-3 font-mono text-slate-400">{item.receipt_no}</td>
-                            <td className="px-4 py-3 font-mono font-black text-blue-900 bg-blue-50/20">{item.physical_receipt_no || '—'}</td>
-                            <td className="px-4 py-3 font-bold text-slate-900">{item.student_name}</td>
-                            <td className="px-4 py-3 font-mono text-slate-500">{item.student_code}</td>
-                            <td className="px-4 py-3 text-center">
+                            <td className="px-4 py-2.5 text-slate-600">{item.payment_date}</td>
+                            <td className="px-4 py-2.5 font-mono text-slate-400">{item.receipt_no}</td>
+                            <td className="px-4 py-2.5 font-mono font-black text-blue-900 bg-blue-50/20">{item.physical_receipt_no || '—'}</td>
+                            <td className="px-4 py-2.5 font-bold text-slate-900">{item.student_name}</td>
+                            <td className="px-4 py-2.5 font-mono text-slate-500">{item.student_code}</td>
+                            <td className="px-4 py-2.5 text-center">
                               <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                 item.student_current_year === 2
                                   ? 'bg-purple-100 text-purple-800 border border-purple-200'
@@ -337,13 +337,13 @@ export default function Reports({ onSelectStudent }) {
                                 {item.student_current_year === 2 ? '2nd Year' : '1st Year'}
                               </span>
                             </td>
-                            <td className="px-4 py-3">{item.category}</td>
-                            <td className="px-4 py-3">
+                            <td className="px-4 py-2.5">{item.category}</td>
+                            <td className="px-4 py-2.5">
                               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
                                 {item.payment_mode}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-right font-mono font-black text-slate-900">
+                            <td className="px-4 py-2.5 text-right font-mono font-black text-slate-900">
                               ₹{Number(item.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </td>
                           </tr>
@@ -351,6 +351,17 @@ export default function Reports({ onSelectStudent }) {
                       )}
                     </tbody>
                   </table>
+                </div>
+
+                {/* Pinned Bottom Status Bar for Daily Report */}
+                <div className="shrink-0 px-4 py-2 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-600">
+                  <div className="flex items-center gap-2">
+                    <span>Showing <strong>{filteredDailyItems.length}</strong> of <strong>{dailyData.items.length}</strong> collection items</span>
+                    {dailySearch && <span className="text-[11px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-semibold">Search: "{dailySearch}"</span>}
+                  </div>
+                  <div className="text-xs font-medium">
+                    Filtered Total: <strong className="text-emerald-700 font-mono font-bold">₹{filteredDailyItems.reduce((sum, item) => sum + Number(item.total_amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
+                  </div>
                 </div>
               </div>
             </>
@@ -360,14 +371,14 @@ export default function Reports({ onSelectStudent }) {
 
       {/* OUTSTANDING BALANCES REPORT VIEW */}
       {activeReport === 'outstanding' && (
-        <div className="space-y-4">
+        <div className="flex-1 flex flex-col min-h-0 space-y-2.5">
           {/* Official College Report Header */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
+          <div className="shrink-0 bg-white p-3 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
               <img
                 src={collegeLogo}
                 alt="College Logo"
-                className="w-12 h-12 object-contain rounded-lg p-0.5 border border-slate-200 bg-slate-50 shrink-0"
+                className="w-10 h-10 object-contain rounded-lg p-0.5 border border-slate-200 bg-slate-50 shrink-0"
               />
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
@@ -383,30 +394,30 @@ export default function Reports({ onSelectStudent }) {
             </div>
             <button
               onClick={() => window.print()}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition border border-slate-300 self-end sm:self-auto"
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition border border-slate-300 self-end sm:self-auto shrink-0"
             >
               <Printer className="w-3.5 h-3.5 text-slate-600" />
               Print Preview
             </button>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto flex-1">
+          <div className="shrink-0 bg-white p-3 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto flex-1">
               <div className="relative flex-1 min-w-[200px] max-w-xs">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                <Search className="w-3.5 h-3.5 absolute left-3 top-2 text-slate-400" />
                 <input
                   type="text"
                   placeholder="Search student name, code, or phone..."
                   value={studentSearch}
                   onChange={(e) => setStudentSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none bg-white"
+                  className="w-full pl-9 pr-3 py-1 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none bg-white"
                 />
               </div>
 
               <select
                 value={yearFilter}
                 onChange={(e) => setYearFilter(e.target.value)}
-                className="py-1.5 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white font-semibold text-slate-800"
+                className="py-1 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white font-semibold text-slate-800"
               >
                 <option value="">All / Both Years</option>
                 <option value="1">1st Year Only (MBA-I)</option>
@@ -416,7 +427,7 @@ export default function Reports({ onSelectStudent }) {
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="py-1.5 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
+                className="py-1 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
               >
                 <option value="">All Categories</option>
                 <option value="OPEN">OPEN</option>
@@ -446,28 +457,28 @@ export default function Reports({ onSelectStudent }) {
 
             <button
               onClick={handleDownloadOutstandingExcel}
-              className="w-full md:w-auto px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow transition shrink-0"
+              className="w-full md:w-auto px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition shrink-0"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-3.5 h-3.5" />
               Download Outstanding Excel (.xlsx)
             </button>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-auto">
+              <table className="w-full text-left text-xs border-separate border-spacing-0">
+                <thead className="bg-slate-100 text-slate-700 uppercase tracking-wider font-semibold sticky top-0 z-10 shadow-xs">
                   <tr>
-                    <th className="px-4 py-3">Student ID</th>
-                    <th className="px-4 py-3">Student Name</th>
-                    <th className="px-4 py-3 text-center">Class / Year</th>
-                    <th className="px-4 py-3">Category</th>
-                    <th className="px-4 py-3">Gender</th>
-                    <th className="px-4 py-3">Phone</th>
-                    <th className="px-4 py-3 text-right">Applicable Fee</th>
-                    <th className="px-4 py-3 text-right">Fee Paid</th>
-                    <th className="px-4 py-3 text-right">Fines Due</th>
-                    <th className="px-4 py-3 text-right font-black">Net Total Due</th>
+                    <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-2.5 border-b border-slate-200">Student ID</th>
+                    <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-2.5 border-b border-slate-200">Student Name</th>
+                    <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-2.5 border-b border-slate-200 text-center">Class / Year</th>
+                    <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-2.5 border-b border-slate-200">Category</th>
+                    <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-2.5 border-b border-slate-200">Gender</th>
+                    <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-2.5 border-b border-slate-200">Phone</th>
+                    <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-2.5 border-b border-slate-200 text-right">Applicable Fee</th>
+                    <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-2.5 border-b border-slate-200 text-right">Fee Paid</th>
+                    <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-2.5 border-b border-slate-200 text-right">Fines Due</th>
+                    <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-2.5 border-b border-slate-200 text-right font-black">Net Total Due</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
@@ -490,9 +501,9 @@ export default function Reports({ onSelectStudent }) {
                         onClick={() => onSelectStudent && onSelectStudent(s.id)}
                         className="hover:bg-blue-50/50 cursor-pointer transition"
                       >
-                        <td className="px-4 py-3 font-mono font-bold text-blue-700">{s.student_code}</td>
-                        <td className="px-4 py-3 font-bold text-slate-900">{s.full_name}</td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-4 py-2.5 font-mono font-bold text-blue-700">{s.student_code}</td>
+                        <td className="px-4 py-2.5 font-bold text-slate-900">{s.full_name}</td>
+                        <td className="px-4 py-2.5 text-center">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                             s.current_year === 2
                               ? 'bg-purple-100 text-purple-800 border border-purple-200'
@@ -503,19 +514,19 @@ export default function Reports({ onSelectStudent }) {
                             {s.current_year === 2 ? '2nd Year' : s.current_year === 1 ? '1st Year' : 'Passed Out'}
                           </span>
                         </td>
-                        <td className="px-4 py-3">{s.category}</td>
-                        <td className="px-4 py-3">{s.gender}</td>
-                        <td className="px-4 py-3 text-slate-600">{s.mobile_number || '—'}</td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-700">
+                        <td className="px-4 py-2.5">{s.category}</td>
+                        <td className="px-4 py-2.5">{s.gender}</td>
+                        <td className="px-4 py-2.5 text-slate-600">{s.mobile_number || '—'}</td>
+                        <td className="px-4 py-2.5 text-right font-mono text-slate-700">
                           ₹{Number(s.net_fee_due).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </td>
-                        <td className="px-4 py-3 text-right font-mono text-emerald-700 font-semibold">
+                        <td className="px-4 py-2.5 text-right font-mono text-emerald-700 font-semibold">
                           ₹{Number(s.total_fee_paid).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </td>
-                        <td className="px-4 py-3 text-right font-mono text-amber-700">
+                        <td className="px-4 py-2.5 text-right font-mono text-amber-700">
                           {Number(s.total_fines_balance) > 0 ? `₹${Number(s.total_fines_balance).toLocaleString('en-IN')}` : '—'}
                         </td>
-                        <td className="px-4 py-3 text-right font-mono">
+                        <td className="px-4 py-2.5 text-right font-mono">
                           <div className="font-extrabold text-rose-600">
                             ₹{Number(s.overall_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </div>
@@ -530,6 +541,18 @@ export default function Reports({ onSelectStudent }) {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Pinned Bottom Status Bar for Outstanding Report */}
+            <div className="shrink-0 px-4 py-2 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-600">
+              <div className="flex items-center gap-2">
+                <span>Showing <strong>{filteredOutstandingStudents.length}</strong> of <strong>{students.length}</strong> students</span>
+                {categoryFilter && <span className="text-[11px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-semibold">Category: {categoryFilter}</span>}
+                {studentSearch && <span className="text-[11px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-semibold">Search: "{studentSearch}"</span>}
+              </div>
+              <div className="text-xs font-medium">
+                Total Outstanding: <strong className="text-rose-600 font-mono font-bold">₹{filteredOutstandingStudents.reduce((sum, s) => sum + Number(s.overall_balance || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
+              </div>
             </div>
           </div>
         </div>

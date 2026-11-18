@@ -175,8 +175,10 @@ export default function App() {
     );
   }
 
+  const isFullHeightView = ['students', 'payments', 'fines', 'scholarships', 'reports'].includes(tab) && !(tab === 'students' && selectedStudentId);
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+    <div className="h-screen bg-slate-50 flex flex-col font-sans overflow-hidden">
       <Navbar
         user={user}
         onLogout={() => setShowLogoutConfirm(true)}
@@ -187,7 +189,7 @@ export default function App() {
         }}
       />
 
-      <div className="flex-1 flex w-full">
+      <div className="flex-1 flex w-full min-h-0 overflow-hidden">
         <Sidebar
           currentTab={tab}
           setTab={(t) => {
@@ -197,7 +199,7 @@ export default function App() {
           user={user}
         />
 
-        <main className="flex-1 p-4 sm:p-6 overflow-y-auto min-w-0">
+        <main className={`flex-1 min-w-0 ${isFullHeightView ? 'p-3 sm:p-4 flex flex-col h-full overflow-hidden' : 'p-4 sm:p-6 overflow-y-auto'}`}>
           {tab === 'dashboard' && (
             <Dashboard
               setTab={setTab}

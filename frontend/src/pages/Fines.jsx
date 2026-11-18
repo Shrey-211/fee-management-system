@@ -146,10 +146,10 @@ export default function Fines({ initialStudent, onClearInitialStudent, onSelectS
   });
 
   return (
-    <div className="space-y-4">
+    <div className="flex-1 flex flex-col min-h-0 h-full space-y-3">
       {/* Top Filter and Action Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3 w-full md:w-auto flex-1 max-w-lg">
+      <div className="shrink-0 bg-white p-3 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 w-full md:w-auto flex-1 max-w-lg">
           <div className="relative flex-1">
             <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
             <input
@@ -157,14 +157,14 @@ export default function Fines({ initialStudent, onClearInitialStudent, onSelectS
               placeholder="Search by student name, ID code, or event..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
+              className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
             />
           </div>
 
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="py-2 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white shrink-0"
+            className="py-1.5 px-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white shrink-0"
           >
             <option value="">All Fine Statuses</option>
             <option value="UNPAID">UNPAID (Active Dues)</option>
@@ -179,28 +179,28 @@ export default function Fines({ initialStudent, onClearInitialStudent, onSelectS
             setSelectedStudentId('');
             setShowModal(true);
           }}
-          className="w-full md:w-auto px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow shrink-0"
+          className="w-full md:w-auto px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-xs shrink-0"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-3.5 h-3.5" />
           Levy Event Fine
         </button>
       </div>
 
-      {/* Fines Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+      {/* Fines Table Card */}
+      <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-auto">
+          <table className="w-full text-left text-xs border-separate border-spacing-0">
+            <thead className="bg-slate-100 text-slate-700 uppercase tracking-wider font-semibold sticky top-0 z-10 shadow-xs">
               <tr>
-                <th className="px-4 py-3">Date Applied</th>
-                <th className="px-4 py-3">Student Name</th>
-                <th className="px-4 py-3">ID Code</th>
-                <th className="px-4 py-3">Event / Reason</th>
-                <th className="px-4 py-3 text-right">Fine Levied</th>
-                <th className="px-4 py-3 text-right">Paid Amount</th>
-                <th className="px-4 py-3 text-right">Balance Due</th>
-                <th className="px-4 py-3 text-center">Status</th>
-                <th className="px-4 py-3 text-center">Actions</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200">Date Applied</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200">Student Name</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200">ID Code</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200">Event / Reason</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200 text-right">Fine Levied</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200 text-right">Paid Amount</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200 text-right">Balance Due</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200 text-center">Status</th>
+                <th className="sticky top-0 z-10 bg-slate-100 text-slate-700 px-4 py-3 border-b border-slate-200 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
@@ -267,6 +267,19 @@ export default function Fines({ initialStudent, onClearInitialStudent, onSelectS
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Pinned Bottom Status Bar */}
+        <div className="shrink-0 px-4 py-2 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-600">
+          <div className="flex items-center gap-2">
+            <span>Showing <strong>{filteredFines.length}</strong> of <strong>{fines.length}</strong> fines</span>
+            {statusFilter && <span className="text-[11px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-semibold">Status: {statusFilter}</span>}
+            {search && <span className="text-[11px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-semibold">Search: "{search}"</span>}
+          </div>
+          <div className="flex items-center gap-4 text-xs font-medium">
+            <span>Total Balance Due: <strong className="text-amber-700 font-mono font-bold">₹{filteredFines.reduce((sum, f) => sum + Number(f.balance || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></span>
+            <span>Total Paid: <strong className="text-emerald-700 font-mono font-bold">₹{filteredFines.reduce((sum, f) => sum + Number(f.paid_amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></span>
+          </div>
         </div>
       </div>
 

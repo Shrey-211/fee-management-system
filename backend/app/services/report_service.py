@@ -350,3 +350,140 @@ def export_outstanding_dues_excel(
     wb.save(output)
     output.seek(0)
     return output
+
+
+def export_scholarships_excel(
+    db: Session,
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+    ids: Optional[List[int]] = None
+) -> io.BytesIO:
+    query = db.query(ScholarshipCredit).join(Student, ScholarshipCredit.student_id == Student.id)
+    if ids is not None and len(ids) > 0:
+        query = query.filter(ScholarshipCredit.id.in_(ids))
+    else:
+        if search:
+            s = f"%{search.strip()}%"
+            from sqlalchemy import or_
+            query = query.filter(or_(
+                Student.full_name.ilike(s),
+                Student.student_code.ilike(s),
+                ScholarshipCredit.scholarship_name.ilike(s),
+                ScholarshipCredit.sanction_order_no.ilike(s)
+            ))
+
+    credits = query.order_by(ScholarshipCredit.id.desc()).all()
+
+    # Apply status filter if not already filtered by exact IDs
+    filtered = []
+    for sc in credits:
+        amt = quantize_amount(sc.amount)
+        rec = quantize_amount(getattr(sc, 'received_amount', None) or (amt if getattr(sc, 'status', None) == 'RECEIVED' else Decimal("0.00")))
+        rem = quantize_amount(max(Decimal("0.00"), amt - rec))
+        if rec <= Decimal("0.00"):
+            st = "NOT_RECEIVED"
+        elif rec >= amt:
+            st = "RECEIVED"
+        else:
+            st = "PARTIALLY_RECEIVED"
+
+        if (ids is None or len(ids) == 0) and status:
+            stat_filter = status.upper().strip()
+            if stat_filter in ["PARTIAL", "PARTIALLY_RECEIVED"] and st != "PARTIALLY_RECEIVED":
+                continue
+            elif stat_filter == "RECEIVED" and st != "RECEIVED":
+                continue
+            elif stat_filter in ["NOT_RECEIVED", "PENDING"] and st != "NOT_RECEIVED":
+                continue
+
+        filtered.append({
+            "sc": sc,
+            "amt": amt,
+            "rec": rec,
+            "rem": rem,
+            "status": st
+        })
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Scholarship Claims"
+
+    stat_label = (status or "ALL CLAIMS").replace("_", " ").title()
+    header_row = add_college_excel_header(
+        ws,
+        report_title="Government Scholarships & DBT Claims Report",
+        subtitle=f"Filter: {stat_label} | Total Claims: {len(filtered)} | Phaltan, Maharashtra | Generated: {date.today()}",
+        end_col="M"
+    )
+
+    headers = [
+        "Sr. No.", "Student Code", "Student Full Name", "Year / Class", "Academic Year",
+        "Category", "Fee Head", "Scholarship Scheme", "Sanction Order #",
+        "Sanctioned Amount (₹)", "Received Amount (₹)", "Remaining Due (₹)", "Status"
+    ]
+    for c_idx, h in enumerate(headers, 1):
+        ws.cell(row=header_row, column=c_idx, value=h)
+    style_row(ws[header_row], fill=HEADER_FILL, font=HEADER_FONT, alignment=Alignment(horizontal="center"))
+
+    row_idx = header_row + 1
+    tot_sanctioned = Decimal("0.00")
+    tot_received = Decimal("0.00")
+    tot_remaining = Decimal("0.00")
+
+    for idx, item in enumerate(filtered, 1):
+        sc = item["sc"]
+        s = sc.student
+        amt = item["amt"]
+        rec = item["rec"]
+        rem = item["rem"]
+        st = item["status"]
+
+        tot_sanctioned += amt
+        tot_received += rec
+        tot_remaining += rem
+
+        yr_str = "2nd Year" if getattr(s, 'current_year', 1) == 2 else "1st Year" if getattr(s, 'current_year', 1) == 1 else "Passed Out"
+        status_display = "Received" if st == "RECEIVED" else "Partially Received" if st == "PARTIALLY_RECEIVED" else "Not Received"
+
+        row_vals = [
+            idx,
+            s.student_code if s else "N/A",
+            s.full_name if s else "Unknown",
+            yr_str,
+            s.academic_year if s else "N/A",
+            s.category if s else "N/A",
+            sc.fee_head.name if sc.fee_head else "Tuition / General",
+            sc.scholarship_name,
+            sc.sanction_order_no or "Pending",
+            float(amt),
+            float(rec),
+            float(rem),
+            status_display
+        ]
+
+        for c_idx, val in enumerate(row_vals, 1):
+            ws.cell(row=row_idx, column=c_idx, value=val)
+        style_row(ws[row_idx], font=NORMAL_FONT)
+        for c in ["J", "K", "L"]:
+            ws[f"{c}{row_idx}"].number_format = "#,##0.00"
+        row_idx += 1
+
+    total_vals = [
+        "TOTAL", "", "", "", "", "", "", "", "",
+        float(tot_sanctioned), float(tot_received), float(tot_remaining), ""
+    ]
+    for c_idx, val in enumerate(total_vals, 1):
+        ws.cell(row=row_idx, column=c_idx, value=val)
+    style_row(ws[row_idx], fill=TOTAL_FILL, font=BOLD_FONT)
+    for c in ["J", "K", "L"]:
+        ws[f"{c}{row_idx}"].number_format = "#,##0.00"
+
+    for col_idx, col in enumerate(ws.columns, 1):
+        max_len = max(len(str(cell.value or '')) for cell in col if not type(cell).__name__ == "MergedCell")
+        col_letter = get_column_letter(col_idx)
+        ws.column_dimensions[col_letter].width = max(max_len + 3, 14)
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output
