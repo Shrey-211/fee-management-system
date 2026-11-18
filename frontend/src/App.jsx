@@ -218,6 +218,11 @@ export default function App() {
                 setSelectedStudentId(id);
                 setTab('student-detail');
               }}
+              onRecordPayment={(st) => {
+                setStudentForPayment(st);
+                setTab('payments');
+              }}
+              user={user}
             />
           )}
 
@@ -236,6 +241,7 @@ export default function App() {
                 setStudentForFine(st);
                 setTab('fines');
               }}
+              user={user}
             />
           )}
 

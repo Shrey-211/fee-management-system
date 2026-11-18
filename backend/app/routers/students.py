@@ -481,3 +481,54 @@ def promote_student(
     return get_student_detail(student.id, current_user=current_user, db=db)
 
 
+@router.delete("/{student_id}")
+def delete_student(
+    student_id: int,
+    current_user: User = Depends(require_accountant_or_admin),
+    db: Session = Depends(get_db)
+):
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    student_code = student.student_code
+    student_name = student.full_name
+    academic_year = student.academic_year
+    current_year = student.current_year
+
+    # Snapshot balances for immutable audit log
+    fee_balance = sum([quantize_amount(h.balance) for h in student.fee_heads], Decimal("0.00"))
+    active_fines = [f for f in student.fines if f.status != "WAIVED"]
+    fines_balance = sum([quantize_amount(f.balance) for f in active_fines], Decimal("0.00"))
+    total_paid = sum([quantize_amount(h.paid_amount) for h in student.fee_heads], Decimal("0.00"))
+    total_outstanding = quantize_amount(fee_balance + fines_balance)
+
+    log_audit(
+        db,
+        action="DELETE_STUDENT",
+        entity_name="students",
+        entity_id=student.id,
+        user_id=current_user.id if current_user else None,
+        details={
+            "student_code": student_code,
+            "full_name": student_name,
+            "academic_year": academic_year,
+            "current_year": current_year,
+            "total_fee_paid": str(total_paid),
+            "pending_fee_balance": str(fee_balance),
+            "pending_fines_balance": str(fines_balance),
+            "total_outstanding": str(total_outstanding)
+        }
+    )
+
+    db.delete(student)
+    db.commit()
+
+    return {
+        "success": True,
+        "message": f"Student '{student_name}' ({student_code}) and all associated records have been permanently deleted.",
+        "student_id": student_id
+    }
+
+
+

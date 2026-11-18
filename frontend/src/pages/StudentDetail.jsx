@@ -7,8 +7,9 @@ import {
 import ModalDialog from '../components/ModalDialog';
 import ReceiptModal from '../components/ReceiptModal';
 import StudentStatementModal from '../components/StudentStatementModal';
+import DeleteStudentModal from '../components/DeleteStudentModal';
 
-export default function StudentDetail({ studentId, onBack, onRecordPayment, onLevyFine }) {
+export default function StudentDetail({ studentId, onBack, onRecordPayment, onLevyFine, user }) {
   const [student, setStudent] = useState(null);
   const [feeTypes, setFeeTypes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,6 +23,7 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
   const [receiptModal, setReceiptModal] = useState({ isOpen: false, payment: null });
   const [statementModal, setStatementModal] = useState(false);
   const [promoteModal, setPromoteModal] = useState({ isOpen: false, loading: false });
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, student: null });
 
   // Edit Profile Modal
   const [showEditModal, setShowEditModal] = useState(false);
@@ -432,6 +434,16 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
           >
             <Receipt className="w-3.5 h-3.5" />
             Record Payment Entry
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setDeleteModal({ isOpen: true, student })}
+            className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow-xs"
+            title="Permanently delete this student from database"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+            Delete Student
           </button>
         </div>
       </div>
@@ -1574,6 +1586,18 @@ export default function StudentDetail({ studentId, onBack, onRecordPayment, onLe
           </div>
         </div>
       )}
+
+      {/* Delete Student Modal */}
+      <DeleteStudentModal
+        isOpen={deleteModal.isOpen}
+        student={deleteModal.student}
+        onClose={() => setDeleteModal({ isOpen: false, student: null })}
+        onClearDues={(st) => onRecordPayment(st)}
+        onDeleted={() => {
+          setDeleteModal({ isOpen: false, student: null });
+          onBack();
+        }}
+      />
     </div>
   );
 }

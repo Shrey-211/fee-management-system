@@ -3,8 +3,9 @@ import { api } from '../api/client';
 import { 
   Search, Plus, Filter, UserCheck, 
   ChevronRight, ArrowUpDown, X, CheckCircle, Clock, Award,
-  GraduationCap
+  GraduationCap, Trash2
 } from 'lucide-react';
+import DeleteStudentModal from '../components/DeleteStudentModal';
 
 const ACADEMIC_YEARS = [
   '2024-2025',
@@ -16,7 +17,7 @@ const ACADEMIC_YEARS = [
   '2030-2031'
 ];
 
-export default function Students({ onSelectStudent }) {
+export default function Students({ onSelectStudent, onRecordPayment, user }) {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -29,6 +30,10 @@ export default function Students({ onSelectStudent }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [feeTypes, setFeeTypes] = useState([]);
   const [feeHeads, setFeeHeads] = useState([]);
+
+  // Delete Student Modal State
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, student: null });
+  const [deleteSuccessMsg, setDeleteSuccessMsg] = useState('');
 
   // Promote Modal State
   const [promoteModal, setPromoteModal] = useState({ isOpen: false, student: null, loading: false });
@@ -283,6 +288,23 @@ export default function Students({ onSelectStudent }) {
 
   return (
     <div className="space-y-4">
+      {/* Delete Success Alert Banner */}
+      {deleteSuccessMsg && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center justify-between font-medium animate-in fade-in duration-200 shadow-xs">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{deleteSuccessMsg}</span>
+          </div>
+          <button 
+            type="button"
+            onClick={() => setDeleteSuccessMsg('')} 
+            className="text-emerald-700 hover:text-emerald-900 p-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Search and Action Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex-1 w-full flex flex-wrap items-center gap-3">
@@ -524,8 +546,27 @@ export default function Students({ onSelectStudent }) {
                             Promote
                           </button>
                         )}
-                        <button className="text-blue-600 hover:text-blue-800 font-semibold text-xs flex items-center justify-center">
+                        <button 
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectStudent(s.id);
+                          }}
+                          className="text-blue-600 hover:text-blue-800 font-semibold text-xs flex items-center justify-center px-1.5 py-1 hover:bg-blue-50 rounded transition"
+                        >
                           View <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteModal({ isOpen: true, student: s });
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition border border-transparent hover:border-rose-200"
+                          title="Delete student from database"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>
@@ -840,6 +881,25 @@ export default function Students({ onSelectStudent }) {
           </div>
         </div>
       )}
+
+      {/* Delete Student Modal */}
+      <DeleteStudentModal
+        isOpen={deleteModal.isOpen}
+        student={deleteModal.student}
+        onClose={() => setDeleteModal({ isOpen: false, student: null })}
+        onClearDues={(st) => {
+          if (onRecordPayment) {
+            onRecordPayment(st);
+          } else {
+            onSelectStudent(st.id);
+          }
+        }}
+        onDeleted={(st) => {
+          setDeleteSuccessMsg(`Student "${st.full_name}" (${st.student_code}) has been permanently deleted from the database. All dashboard totals and reports have been recalculated.`);
+          loadStudents();
+          setTimeout(() => setDeleteSuccessMsg(''), 6000);
+        }}
+      />
     </div>
   );
 }

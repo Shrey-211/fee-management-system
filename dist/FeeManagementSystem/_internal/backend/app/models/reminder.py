@@ -25,5 +25,5 @@ class ReminderLog(Base):
     status = Column(String(20), default="SENT")  # SENT, FAILED
     error_message = Column(Text, nullable=True)
 
-    student = relationship("Student")
+    student = relationship("Student", back_populates="reminder_logs")
 

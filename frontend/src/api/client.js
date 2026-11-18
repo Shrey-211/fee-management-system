@@ -163,6 +163,9 @@ export const api = {
   promoteStudent: (id) => request(`/students/${id}/promote`, {
     method: 'POST'
   }),
+  deleteStudent: (id) => request(`/students/${id}`, {
+    method: 'DELETE'
+  }),
 
   // Fees
   getFeeHeads: (params) => {
