@@ -2,7 +2,7 @@
 ; Krishna Foundation's Shrimant Jayshreemaladevi Naik Nimbalkar Institute of Management Studies, Phaltan
 
 #define MyAppName "Fee Management System"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.0"
 #define MyAppPublisher "Krishna Foundation's SJNNIMS, Phaltan"
 #define MyAppExeName "FeeManagementSystem.exe"
 #define MyAppAssocName MyAppName + " File"
@@ -15,7 +15,7 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir=releases
-OutputBaseFilename=FeeManagementSystem_Setup_v1.0.0
+OutputBaseFilename=FeeManagementSystem_Setup_v1.1.0
 SetupIconFile=assets\app_icon.ico
 Compression=lzma2/max
 SolidCompression=yes

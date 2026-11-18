@@ -78,7 +78,7 @@ class Settings(BaseSettings):
     COLLEGE_SHORT_NAME: str = "KF's SJNNIMS, Phaltan"
     COLLEGE_ADDRESS: str = "Phaltan, Dist. Satara, Maharashtra"
     COLLEGE_TAGLINE: str = "Approved by AICTE New Delhi & Affiliated to Shivaji University, Kolhapur"
-    VERSION: str = "1.0.0"
+    VERSION: str = "1.1.0"
     DEBUG: bool = False
 
     # Cryptographic Secret

@@ -79,12 +79,19 @@ def build():
         f.unlink(missing_ok=True)
 
     src_db = root / "backend" / "data" / "fees.db"
-    if src_db.exists():
-        clean_database(src_db)
     dest_db = target_data / "fees.db"
     if src_db.exists():
-        print(f"Copying clean production database ({src_db.stat().st_size} bytes) to {dest_db}...")
-        shutil.copy2(src_db, dest_db)
+        backup_src = root / "backend" / "data" / "fees.db.dev_backup"
+        try:
+            shutil.copy2(src_db, backup_src)
+            clean_database(src_db)
+            print(f"Copying clean production database ({src_db.stat().st_size} bytes) to {dest_db}...")
+            shutil.copy2(src_db, dest_db)
+        finally:
+            if backup_src.exists():
+                shutil.copy2(backup_src, src_db)
+                backup_src.unlink(missing_ok=True)
+                print("Restored active development database.")
 
     # 4. Remove intermediate build/ artifacts so users don't mistake them for the executable
     intermediate_exe = root / "build" / "FeeManagementSystem" / "FeeManagementSystem.exe"
@@ -113,7 +120,7 @@ def build():
     # 6. Package a clean release zip
     releases_dir = root / "releases"
     releases_dir.mkdir(parents=True, exist_ok=True)
-    zip_path = releases_dir / "FeeManagementSystem-v1.0.0-windows.zip"
+    zip_path = releases_dir / "FeeManagementSystem-v1.1.0-windows.zip"
     print(f"Creating release package: {zip_path.name}...")
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
         for file in dist_app.rglob('*'):
@@ -132,19 +139,25 @@ def build():
         print(f"Compiling Windows Installer using Inno Setup ({iscc})...")
         res_iss = subprocess.run([str(iscc), "/Q", str(root / "installer.iss")], cwd=root)
         if res_iss.returncode == 0:
-            setup_exe = releases_dir / "FeeManagementSystem_Setup_v1.0.0.exe"
-            root_setup = root / "FeeManagementSystem_Setup_v1.0.0.exe"
+            setup_exe = releases_dir / "FeeManagementSystem_Setup_v1.1.0.exe"
+            root_setup = root / "FeeManagementSystem_Setup_v1.1.0.exe"
+            v110_exe = root / "v1.1.0.exe"
+            releases_v110_exe = releases_dir / "v1.1.0.exe"
             try:
                 shutil.copy2(setup_exe, root_setup)
+                shutil.copy2(setup_exe, v110_exe)
+                shutil.copy2(setup_exe, releases_v110_exe)
             except Exception:
                 pass
             print(f"Windows Setup Installer ready: {setup_exe} ({round(setup_exe.stat().st_size / (1024*1024), 2)} MB)")
+            print(f"Direct Alias ready: {v110_exe}")
 
     print("\n=======================================================")
     print(" BUILD & PACKAGING COMPLETE!")
-    print(f" Setup Installer (.exe): FeeManagementSystem_Setup_v1.0.0.exe")
+    print(f" Setup Installer (.exe): FeeManagementSystem_Setup_v1.1.0.exe")
+    print(f" Direct Named Installer: v1.1.0.exe")
     print(f" Standalone App Folder:  dist/FeeManagementSystem/FeeManagementSystem.exe")
-    print(f" Release Zip:            releases/FeeManagementSystem-v1.0.0-windows.zip")
+    print(f" Release Zip:            releases/FeeManagementSystem-v1.1.0-windows.zip")
     print("=======================================================")
     return True
 
